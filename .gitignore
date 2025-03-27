@@ -1,0 +1,52 @@
+# Python-specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments (created by uv)
+.venv/
+venv/
+env/
+
+# uv-specific
+# uv.lock is already in version control, but we might exclude local caches
+.uv_cache/
+.pypirc
+
+# Docker-specific
+Dockerfile.lock
+*.dockerignore
+docker-compose.yml.bak
+
+# Logs and runtime files (from your app)
+changes.log
+*.log
+*.log.*
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Test-related
+.pytest_cache/
+coverage/
+.coverage
+*.cover
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+.env

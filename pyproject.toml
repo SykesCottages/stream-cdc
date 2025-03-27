@@ -1,0 +1,30 @@
+[project]
+name = "cdc-worker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.37.20",
+    "cryptography>=44.0.2",
+    "mysql-connector-python>=9.2.0",
+    "mysql-replication>=1.0.9",
+    "psycopg[binary]>=3.2.6",
+    "pymysql>=1.1.1",
+    "python-dotenv>=1.0.1",
+]
+
+
+[tool.ruff]
+line-length = 115
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = ["E", "W"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.0",
+    "watchdog>=6.0.0",
+]

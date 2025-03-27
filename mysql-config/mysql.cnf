@@ -1,0 +1,6 @@
+[mysqld]
+log_bin = /var/lib/mysql/mysql-bin.log  # Enable binary logging
+binlog_format = ROW                     # Set binlog format to ROW
+binlog_row_metadata = FULL              # Include full metadata (column names, types, etc.)
+binlog_row_image = FULL                 # Log full row images for all events
+server_id = 1                           # Required for binary logging
