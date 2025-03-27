@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CONTAINER_NAME="cdc-worker-mysql-1"
+CONTAINER_NAME="stream-cdc-mysql-1"
 DB_USER="root"
 DB_PASSWORD="password"
 DB_NAME="test"
