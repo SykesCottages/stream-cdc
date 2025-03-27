@@ -51,7 +51,7 @@ services:
       sh -c "
         uv venv .venv &&
         uv sync &&
-        watchmedo auto-restart --patterns='*.py' --no-restart-on-command-exit -- uv run main.py
+        watchmedo auto-restart --patterns='*.py' --no-restart-on-command-exit -- uv run src/main.py
       "
 
 volumes:
