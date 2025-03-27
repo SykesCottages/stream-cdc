@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CONTAINER_NAME="cdc-worker-mysql-1"
+CONTAINER_NAME="stream-cdc-mysql-1"
 DB_USER="root"
 DB_PASSWORD="password"
 DB_NAME="test"
@@ -33,3 +33,11 @@ INSERT INTO users (name, email, status) VALUES
     ('Ethan Hunt', 'ethan.hunt@example.com', 'inactive'),
     ('Hannah Lee', 'hannah.lee@example.com', 'inactive'),
     ('Julia Adams', 'julia.adams@example.com', 'active');
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "Database initialization completed successfully."
+else
+    echo "Error: Database initialization failed."
+    exit 1
+fi
