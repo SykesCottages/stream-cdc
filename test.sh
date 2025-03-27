@@ -33,3 +33,11 @@ INSERT INTO users (name, email, status) VALUES
     ('Ethan Hunt', 'ethan.hunt@example.com', 'inactive'),
     ('Hannah Lee', 'hannah.lee@example.com', 'inactive'),
     ('Julia Adams', 'julia.adams@example.com', 'active');
+EOF
+
+if [ $? -eq 0 ]; then
+    echo "Database initialization completed successfully."
+else
+    echo "Error: Database initialization failed."
+    exit 1
+fi

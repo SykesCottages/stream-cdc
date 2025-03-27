@@ -1,4 +1,6 @@
 
+# (This app still in alpha use it at your own risk)
+
 # Requirements
 - Install uv
 - Install ruff
