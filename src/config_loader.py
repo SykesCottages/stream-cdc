@@ -60,16 +60,12 @@ class EnvConfigLoader(ConfigLoader):
                 queue_url = os.getenv("SQS_QUEUE_URL")
                 if not queue_url:
                     logger.error("SQS_QUEUE_URL is not set in environment")
-                    raise ConfigurationError(
-                        "SQS_QUEUE_URL is not set in environment"
-                    )
+                    raise ConfigurationError("SQS_QUEUE_URL is not set in environment")
 
                 region = os.getenv("AWS_REGION")
                 if not region:
                     logger.error("AWS_REGION is not set in environment")
-                    raise ConfigurationError(
-                        "AWS_REGION is not set in environment"
-                    )
+                    raise ConfigurationError("AWS_REGION is not set in environment")
 
                 return SQSConfig(
                     queue_url=queue_url,
@@ -80,10 +76,7 @@ class EnvConfigLoader(ConfigLoader):
                 )
             case _:
                 logger.error(f"Unsupported stream type: {stream_type}")
-                raise UnsupportedTypeError(
-                    f"Stream type '{stream_type}' not supported. "
-                    f"Supported types: ['sqs']"
-                )
+                raise UnsupportedTypeError(f"Stream type '{stream_type}' not supported. Supported types: ['sqs']")
 
     def load_datasource_config(self, db_type: str):
         logger.info(f"Loading datasource config for: {db_type}")
@@ -102,18 +95,13 @@ class EnvConfigLoader(ConfigLoader):
                 password = os.getenv("DB_PASSWORD")
                 if not password:
                     logger.error("DB_PASSWORD is not set in environment")
-                    raise ConfigurationError(
-                        "DB_PASSWORD is not set in environment"
-                    )
+                    raise ConfigurationError("DB_PASSWORD is not set in environment")
 
                 port = int(os.getenv("DB_PORT", "3306"))
                 return MysqlConfig(host, user, password, port)
             case _:
                 logger.error(f"Unsupported database type: {db_type}")
-                raise UnsupportedTypeError(
-                    f"Database type '{db_type}' not supported. "
-                    f"Supported types: ['mysql']"
-                )
+                raise UnsupportedTypeError(f"Database type '{db_type}' not supported. Supported types: ['mysql']")
 
     def load_app_config(self) -> AppConfig:
         logger.info("Loading application config")
@@ -121,14 +109,10 @@ class EnvConfigLoader(ConfigLoader):
         batch_size = int(os.getenv("BATCH_SIZE", "10"))
         flush_interval = float(os.getenv("FLUSH_INTERVAL", "5.0"))
 
-        logger.info(
-            f"Config: log_level={log_level}, "
-            f"batch_size={batch_size}, interval={flush_interval}"
-        )
+        logger.info(f"Config: log_level={log_level}, batch_size={batch_size}, interval={flush_interval}")
 
         return AppConfig(
             log_level=log_level,
             batch_size=batch_size,
             flush_interval=flush_interval,
         )
-
