@@ -10,6 +10,7 @@ from serializer import Serializer
 from typing import Any
 from worker import Worker
 
+
 def main() -> None:
     load_dotenv()
 
@@ -26,17 +27,10 @@ def main() -> None:
     stream_factory = StreamFactory(config_loader)
     stream = stream_factory.create(os.getenv("STREAM_TYPE", "sqs").lower())
     serializer = Serializer()
-    processor = StreamProcessor(
-        stream,
-        serializer,
-        app_config.batch_size,
-        app_config.flush_interval
-    )
+    processor = StreamProcessor(stream, serializer, app_config.batch_size, app_config.flush_interval)
 
     data_source_factory = DataSourceFactory(config_loader)
-    data_source = data_source_factory.create(
-        os.getenv("DB_TYPE", "mysql").lower()
-    )
+    data_source = data_source_factory.create(os.getenv("DB_TYPE", "mysql").lower())
 
     worker = Worker(data_source, processor)
 
@@ -50,6 +44,6 @@ def main() -> None:
     logger.info("Starting worker")
     worker.run()
 
+
 if __name__ == "__main__":
     main()
-

@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Optional
 
+
 class Logger:
     _instance = None
 
@@ -60,5 +61,5 @@ class Logger:
         else:
             cls._instance.set_level(log_level)
 
-logger = Logger.get_logger()
 
+logger = Logger.get_logger()

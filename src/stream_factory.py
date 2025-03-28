@@ -36,7 +36,7 @@ class SQS(Stream):
             return
 
         for i in range(0, len(messages), self.SQS_MAX_BATCH_SIZE):
-            batch = messages[i:i + self.SQS_MAX_BATCH_SIZE]
+            batch = messages[i : i + self.SQS_MAX_BATCH_SIZE]
             entries = self._prepare_sqs_entries(batch)
 
             logger.debug(f"Sending batch of {len(batch)} messages")
@@ -65,9 +65,7 @@ class SQS(Stream):
                 message_body = json.dumps(msg)
                 # Check if message exceeds SQS size limit (256KB)
                 if len(message_body.encode("utf-8")) > 256 * 1024:
-                    logger.error(
-                        f"Message size exceeds SQS limit of 256KB: {msg}"
-                    )
+                    logger.error(f"Message size exceeds SQS limit of 256KB: {msg}")
                     raise StreamError("Message size exceeds SQS limit of 256KB")
 
                 entry = {"Id": str(idx), "MessageBody": message_body}
@@ -80,20 +78,13 @@ class SQS(Stream):
 
     def _send_batch_to_sqs(self, entries: List[Dict]) -> None:
         """Send a batch of messages to SQS."""
-        response = self._client.send_message_batch(
-            QueueUrl=self._queue_url,
-            Entries=entries
-        )
+        response = self._client.send_message_batch(QueueUrl=self._queue_url, Entries=entries)
 
         if "Failed" in response and response["Failed"]:
             failed_count = len(response["Failed"])
             failed_ids = [item["Id"] for item in response["Failed"]]
-            logger.error(
-                f"Failed to send {failed_count} messages. IDs: {failed_ids}"
-            )
-            raise StreamError(
-                f"Failed to send {failed_count} messages to SQS. IDs: {failed_ids}"
-            )
+            logger.error(f"Failed to send {failed_count} messages. IDs: {failed_ids}")
+            raise StreamError(f"Failed to send {failed_count} messages to SQS. IDs: {failed_ids}")
 
 
 class StreamFactory:
@@ -110,13 +101,9 @@ class StreamFactory:
         logger.debug(f"Creating stream of type: {normalized_type}")
 
         if normalized_type not in self._supported_types:
-            logger.error(
-                f"Unsupported stream type: {stream_type}. "
-                f"Supported types: {self._supported_types}"
-            )
+            logger.error(f"Unsupported stream type: {stream_type}. Supported types: {self._supported_types}")
             raise UnsupportedTypeError(
-                f"Stream type '{stream_type}' not supported. "
-                f"Supported types: {self._supported_types}"
+                f"Stream type '{stream_type}' not supported. Supported types: {self._supported_types}"
             )
 
         if normalized_type == "sqs":
@@ -125,4 +112,3 @@ class StreamFactory:
 
         # Should never reach here due to validation above
         raise UnsupportedTypeError(f"Unhandled stream type: {stream_type}")
-

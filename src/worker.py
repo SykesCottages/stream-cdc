@@ -4,12 +4,9 @@ from datasource_factory import DataSource
 from processor import StreamProcessor
 from exceptions import ProcessingError
 
+
 class Worker:
-    def __init__(
-        self,
-        data_source: DataSource,
-        processor: StreamProcessor
-    ) -> None:
+    def __init__(self, data_source: DataSource, processor: StreamProcessor) -> None:
         self.data_source = data_source
         self.processor = processor
         self.running = True
@@ -37,4 +34,3 @@ class Worker:
         self.running = False
         time.sleep(2)
         exit(0)
-
