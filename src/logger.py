@@ -1,4 +1,3 @@
-# logger.py
 import logging
 import os
 from typing import Optional
@@ -9,7 +8,6 @@ class Logger:
     def __init__(self, log_level: str = "INFO", logger_name: Optional[str] = None):
         """
         Initialize the logger with a specific log level and optional name.
-
         Args:
             log_level (str): The logging level (e.g., "INFO", "DEBUG"). Defaults to "INFO".
             logger_name (str, optional): The name of the logger. Defaults to APP_NAME or "stream-cdc".
@@ -30,7 +28,6 @@ class Logger:
     def set_level(self, log_level: str) -> None:
         """
         Set or update the logging level.
-
         Args:
             log_level (str): The logging level (e.g., "INFO", "DEBUG").
         """
@@ -42,10 +39,8 @@ class Logger:
     def get_logger(cls, log_level: str = "INFO") -> logging.Logger:
         """
         Get the singleton logger instance, creating it if it doesn’t exist.
-
         Args:
             log_level (str): The logging level to use if creating a new instance.
-
         Returns:
             logging.Logger: The configured logger instance.
         """
@@ -57,7 +52,6 @@ class Logger:
     def update_level(cls, log_level: str) -> None:
         """
         Update the logging level of the existing logger.
-
         Args:
             log_level (str): The new logging level.
         """

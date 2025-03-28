@@ -1,6 +1,6 @@
 from typing import Any
 import json
-import logging
+from logger import logger
 
 
 class Serializer:
@@ -11,7 +11,7 @@ class Serializer:
             # Probably not the best approach but transforming anything into a
             # string makes it easier to push raw data to a stream
             # Open to suggestions
-            logging.debug(
+            logger.debug(
                 f"Serialization exception: {e}, converting entire object to string"
             )
             return str(data)

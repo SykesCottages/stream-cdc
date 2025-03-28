@@ -22,7 +22,7 @@ class Worker:
                 for change in self.data_source.listen():
                     if not self.running:
                         break
-                    logger.debug(f"Processing event from {change['table']}")
+                    logger.info(f"Processing event from {change['table']}")
                     self.processor.process(change)
         except Exception as e:
             logger.error(f"Worker error: {e}")

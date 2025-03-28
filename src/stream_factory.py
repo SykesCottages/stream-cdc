@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Any, Dict
 import boto3
 import json
-import logging
+from logger import logger
 from exceptions import UnsupportedTypeError, StreamError
 from config_loader import SQSConfig
 
@@ -39,7 +39,7 @@ class SQS(Stream):
             batch = messages[i:i + self.SQS_MAX_BATCH_SIZE]
             entries = self._prepare_sqs_entries(batch)
 
-            logging.debug(f"Sending batch of {len(batch)} messages")
+            logger.debug(f"Sending batch of {len(batch)} messages")
             self._send_batch_to_sqs(entries)
 
     def close(self) -> None:
@@ -65,7 +65,7 @@ class SQS(Stream):
                 message_body = json.dumps(msg)
                 # Check if message exceeds SQS size limit (256KB)
                 if len(message_body.encode("utf-8")) > 256 * 1024:
-                    logging.error(
+                    logger.error(
                         f"Message size exceeds SQS limit of 256KB: {msg}"
                     )
                     raise StreamError("Message size exceeds SQS limit of 256KB")
@@ -73,7 +73,7 @@ class SQS(Stream):
                 entry = {"Id": str(idx), "MessageBody": message_body}
                 entries.append(entry)
             except Exception as e:
-                logging.error(f"Failed to convert message to JSON: {msg}")
+                logger.error(f"Failed to convert message to JSON: {msg}")
                 raise StreamError(f"Failed to convert message to JSON: {str(e)}")
 
         return entries
@@ -88,7 +88,7 @@ class SQS(Stream):
         if "Failed" in response and response["Failed"]:
             failed_count = len(response["Failed"])
             failed_ids = [item["Id"] for item in response["Failed"]]
-            logging.error(
+            logger.error(
                 f"Failed to send {failed_count} messages. IDs: {failed_ids}"
             )
             raise StreamError(
@@ -107,10 +107,10 @@ class StreamFactory:
     def create(self, stream_type: str) -> Stream:
         """Create a Stream implementation based on requested type."""
         normalized_type = stream_type.lower()
-        logging.debug(f"Creating stream of type: {normalized_type}")
+        logger.debug(f"Creating stream of type: {normalized_type}")
 
         if normalized_type not in self._supported_types:
-            logging.error(
+            logger.error(
                 f"Unsupported stream type: {stream_type}. "
                 f"Supported types: {self._supported_types}"
             )

@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 import time
-import logging
+from logger import logger
 from stream_factory import Stream
 from serializer import Serializer
 
@@ -23,7 +23,7 @@ class StreamProcessor:
     def process(self, event: Dict[str, Any]) -> None:
         serialized_event: Dict[str, Any] = self.serializer.serialize(event)
         self.buffer.append(serialized_event)
-        logging.debug(f"Processed event, buffer size: {len(self.buffer)}")
+        logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
 
         if (len(self.buffer) >= self.batch_size or
                 time.time() - self.last_flush_time >= self.flush_interval):
@@ -34,13 +34,13 @@ class StreamProcessor:
             return
 
         messages = self.buffer
-        logging.debug(f"Prepared {len(messages)} messages for sending")
+        logger.debug(f"Prepared {len(messages)} messages for sending")
         self.stream.send(messages)
         self.buffer.clear()
         self.last_flush_time = time.time()
 
     def close(self) -> None:
-        logging.debug("Closing processor, flushing remaining messages")
+        logger.debug("Closing processor, flushing remaining messages")
         self.flush()
         self.stream.close()
 

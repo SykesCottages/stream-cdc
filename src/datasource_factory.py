@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Any, Dict
-import logging
+from logger import logger
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.row_event import (
     DeleteRowsEvent,
@@ -35,7 +35,7 @@ class MySQLDataSource(DataSource):
         self.client = None
 
     def connect(self) -> None:
-        logging.info(f"Connecting to MySQL at {self.host}:{self.port}")
+        logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
         self.client = self.binlog_client(
             connection_settings={
                 "host": self.host,
@@ -48,17 +48,18 @@ class MySQLDataSource(DataSource):
             resume_stream=True,
             only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
         )
-        logging.info("Connected to MySQL binlog stream")
+        logger.info("Connected to MySQL binlog stream")
 
     def listen(self) -> Generator[Dict[str, Any]]:
         if not self.client:
-            logging.error("Data source not connected")
+            logger.error("Data source not connected")
             raise DataSourceError("Data source not connected")
 
         for event in self.client:
             for row in event.rows:
-                logging.debug(
+                logger.info(
                     f"Event: {type(event).__name__}, "
+                    f"Paylod: {row},"
                     f"Schema: {event.schema}, Table: {event.table}"
                 )
                 yield {
@@ -72,7 +73,7 @@ class MySQLDataSource(DataSource):
 
     def disconnect(self) -> None:
         if self.client:
-            logging.info("Disconnecting from MySQL")
+            logger.info("Disconnecting from MySQL")
             self.client.close()
             self.client = None
 
@@ -83,7 +84,7 @@ class DataSourceFactory:
         self.binlog_client = BinLogStreamReader
 
     def create(self, db_type: str) -> DataSource:
-        logging.debug(f"Creating data source of type: {db_type}")
+        logger.debug(f"Creating data source of type: {db_type}")
         match db_type.lower():
             case "mysql":
                 return MySQLDataSource(
@@ -91,7 +92,7 @@ class DataSourceFactory:
                     self.binlog_client
                 )
             case _:
-                logging.error(f"Unsupported database type: {db_type}")
+                logger.error(f"Unsupported database type: {db_type}")
                 raise UnsupportedTypeError(
                     f"Database type '{db_type}' is not supported. "
                     f"Supported types: ['mysql']"
