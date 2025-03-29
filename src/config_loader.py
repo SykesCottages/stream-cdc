@@ -53,7 +53,7 @@ class ConfigLoader(ABC):
 
 
 class EnvConfigLoader(ConfigLoader):
-    def load_stream_config(self, stream_type: str):
+    def load_stream_config(self, stream_type: str) -> StreamConfig:
         logger.info(f"Loading stream config for: {stream_type}")
         match stream_type.lower():
             case "sqs":

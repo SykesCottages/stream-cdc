@@ -4,7 +4,7 @@ import boto3
 import json
 from logger import logger
 from exceptions import UnsupportedTypeError, StreamError
-from config_loader import SQSConfig
+from config_loader import SQSConfig, ConfigLoader
 
 
 class Stream(ABC):
@@ -90,25 +90,20 @@ class SQS(Stream):
 class StreamFactory:
     """Factory for creating Stream implementations."""
 
-    def __init__(self, config_loader):
+    def __init__(self, config_loader: ConfigLoader):
         """Initialize with a configuration loader."""
-        self._config_loader = config_loader
-        self._supported_types = ["sqs"]
+        self.config_loader = config_loader
+        self.supported_types = ["sqs"]
 
     def create(self, stream_type: str) -> Stream:
         """Create a Stream implementation based on requested type."""
         normalized_type = stream_type.lower()
         logger.debug(f"Creating stream of type: {normalized_type}")
 
-        if normalized_type not in self._supported_types:
-            logger.error(f"Unsupported stream type: {stream_type}. Supported types: {self._supported_types}")
-            raise UnsupportedTypeError(
-                f"Stream type '{stream_type}' not supported. Supported types: {self._supported_types}"
-            )
-
-        if normalized_type == "sqs":
-            config = self._config_loader.load_stream_config(normalized_type)
-            return SQS(config)
-
-        # Should never reach here due to validation above
-        raise UnsupportedTypeError(f"Unhandled stream type: {stream_type}")
+        match normalized_type:
+            case "sqs":
+                config = self.config_loader.load_stream_config(normalized_type)
+                return SQS(config)
+            case _:
+                logger.error(f"Unsupported stream type: {stream_type}. Supported types: {self.supported_types}")
+                raise UnsupportedTypeError(f"Unhandled stream type: {stream_type}")
