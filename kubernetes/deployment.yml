@@ -10,14 +10,17 @@ spec:
   selector:
     matchLabels:
       app: stream-cdc
+      version: stream-cdc
   template:
     metadata:
       labels:
         app: stream-cdc
+        version: stream-cdc
     spec:
       containers:
       - name: stream-cdc
         image: sykescottages/stream-cdc:latest
+        imagePullPolicy: Always
         envFrom:
         - secretRef:
             name: stream-cdc-secret
