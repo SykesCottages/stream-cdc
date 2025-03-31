@@ -6,7 +6,7 @@ from stream_cdc.streams.factory import StreamFactory
 from stream_cdc.processing.processor import StreamProcessor
 from stream_cdc.datasources.factory import DataSourceFactory
 from stream_cdc.utils.serializer import Serializer
-from typing import Any, cast
+from typing import Any
 from stream_cdc.processing.worker import Worker
 from stream_cdc.config.loader import AppConfig
 
