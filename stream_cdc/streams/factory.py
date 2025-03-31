@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Any, Dict
 import boto3
 import json
-from logger import logger
-from exceptions import UnsupportedTypeError, StreamError
-from config_loader import SQSConfig, ConfigLoader
+from stream_cdc.utils.logger import logger
+from stream_cdc.utils.exceptions import UnsupportedTypeError, StreamError
+from stream_cdc.config.loader import SQSConfig, ConfigLoader
 
 
 class Stream(ABC):

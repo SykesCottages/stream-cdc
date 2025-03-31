@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import os
-from logger import logger
+from stream_cdc.utils.logger import logger
 from abc import ABC, abstractmethod
 from typing import Any
-from exceptions import UnsupportedTypeError, ConfigurationError
+from stream_cdc.utils.exceptions import UnsupportedTypeError, ConfigurationError
 
 
 class StreamConfig(ABC):

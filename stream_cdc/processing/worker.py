@@ -1,8 +1,8 @@
-from logger import logger
+from stream_cdc.utils.logger import logger
 import time
-from datasource_factory import DataSource
-from processor import StreamProcessor
-from exceptions import ProcessingError
+from stream_cdc.datasources.factory import DataSource
+from stream_cdc.processing.processor import StreamProcessor
+from stream_cdc.utils.exceptions import ProcessingError
 
 
 class Worker:
