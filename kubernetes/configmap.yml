@@ -11,7 +11,7 @@ data:
   DB_HOST: "entdb.staging.sykes.cloud"
   DB_ENGINE: "mysql"
   STREAM_TYPE: "sqs"
-  SQS_QUEUE_URL: "https://sqs.eu-west-1.amazonaws.com/476993055961/test"
+  SQS_QUEUE_URL: "https://sqs.eu-west-1.amazonaws.com/476993055961/ew1-s-bi-data-stream"
   AWS_ENDPOINT_URL: "https://sqs.eu-west-1.amazonaws.com"
   AWS_REGION: "eu-west-1"
   AWS_ACCESS_KEY_ID: "AKIAW6DYANTM6MNGYO7Y"
