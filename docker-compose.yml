@@ -31,6 +31,7 @@ services:
 
   app:
     build: .
+    working_dir: /app
     develop:
       watch:
         - action: sync
@@ -44,6 +45,7 @@ services:
       - ./stream_cdc:/app/stream_cdc
       - ./pyproject.toml:/app/pyproject.toml
       - ./uv.lock:/app/uv.lock
+      - ./README.md:/app/README.md
       # - .:/app
     env_file:
       - .env

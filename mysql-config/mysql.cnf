@@ -1,6 +1,10 @@
 [mysqld]
 log_bin = /var/lib/mysql/mysql-bin.log  # Enable binary logging
-binlog_format = ROW                     # Set binlog format to ROW
-binlog_row_metadata = FULL              # Include full metadata (column names, types, etc.)
-binlog_row_image = FULL                 # Log full row images for all events
-server_id = 1                           # Required for binary logging
+server_id=1234
+gtid_mode=ON
+enforce_gtid_consistency=ON
+binlog_format=ROW
+binlog_row_metadata=FULL
+binlog_row_image=FULL
+log_bin=mysql-bin
+log_slave_updates=ON
