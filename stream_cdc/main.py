@@ -1,15 +1,14 @@
 import os
 import signal
 from dotenv import load_dotenv
-from logger import Logger
-from stream_factory import StreamFactory
-from processor import StreamProcessor
-from config_loader import EnvConfigLoader
-from datasource_factory import DataSourceFactory
-from serializer import Serializer
+from stream_cdc.utils.logger import Logger
+from stream_cdc.streams.factory import StreamFactory
+from stream_cdc.processing.processor import StreamProcessor
+from stream_cdc.config.loader import EnvConfigLoader
+from stream_cdc.datasources.factory import DataSourceFactory
+from stream_cdc.utils.serializer import Serializer
 from typing import Any
-from worker import Worker
-
+from stream_cdc.processing.worker import Worker
 
 def main() -> None:
     load_dotenv()
