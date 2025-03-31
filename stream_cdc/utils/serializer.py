@@ -1,6 +1,6 @@
 from typing import Any
 import json
-from logger import logger
+from stream_cdc.utils.logger import logger
 
 
 class Serializer:

@@ -37,11 +37,14 @@ services:
           path: .
           target: /app
           ignore:
-            - .venv/
+            - .venv
         - action: rebuild
           path: ./uv.lock
     volumes:
-      - .:/app
+      - ./stream_cdc:/app/stream_cdc
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+      # - .:/app
     env_file:
       - .env
     depends_on:
@@ -51,7 +54,7 @@ services:
       sh -c "
         uv venv .venv &&
         uv sync &&
-        watchmedo auto-restart --patterns='*.py' --no-restart-on-command-exit -- uv run src/main.py
+        watchmedo auto-restart --recursive --directory=stream_cdc --patterns='**/*.py' --no-restart-on-command-exit -- python -m stream_cdc.main
       "
 
 volumes:

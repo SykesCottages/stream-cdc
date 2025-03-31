@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Any, Dict
-from logger import logger
+from stream_cdc.utils.logger import logger
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent
 from pymysqlreplication.row_event import DeleteRowsEvent, UpdateRowsEvent, WriteRowsEvent
-from config_loader import MysqlConfig, ConfigLoader
-from exceptions import UnsupportedTypeError, DataSourceError
+from stream_cdc.config.loader import MysqlConfig, ConfigLoader
+from stream_cdc.utils.exceptions import UnsupportedTypeError, DataSourceError
 
 
 class DataSource(ABC):

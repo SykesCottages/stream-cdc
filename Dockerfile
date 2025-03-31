@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Then, add the rest of the project source code and install it
 # Installing separately from its dependencies allows optimal layer caching
 COPY pyproject.toml uv.lock ./
-COPY src ./src
+COPY stream_cdc ./stream_cdc
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -30,4 +30,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
 
-CMD [ "uv", "run", "src/main.py" ]
+CMD [ "python", "-m", "stream_cdc.main" ]

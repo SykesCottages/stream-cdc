@@ -1,8 +1,8 @@
 from typing import List, Dict, Any
 import time
-from logger import logger
-from stream_factory import Stream
-from serializer import Serializer
+from stream_cdc.utils.logger import logger
+from stream_cdc.streams.factory import Stream
+from stream_cdc.utils.serializer import Serializer
 
 
 class StreamProcessor:
