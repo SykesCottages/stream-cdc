@@ -4,7 +4,7 @@ from logger import logger
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent
 from pymysqlreplication.row_event import DeleteRowsEvent, UpdateRowsEvent, WriteRowsEvent
-from config_loader import MysqlConfig
+from config_loader import MysqlConfig, ConfigLoader
 from exceptions import UnsupportedTypeError, DataSourceError
 
 
@@ -86,7 +86,7 @@ class MySQLDataSource(DataSource):
 
 
 class DataSourceFactory:
-    def __init__(self, config_loader):
+    def __init__(self, config_loader: ConfigLoader):
         self.config_loader = config_loader
 
     def create(self, db_type: str) -> DataSource:
