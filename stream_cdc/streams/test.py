@@ -1,3 +1,0 @@
-
-def tt():
-    print("test")
