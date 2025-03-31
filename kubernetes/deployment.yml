@@ -1,22 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-app-deployment
+  namespace: stream-cdc
+  name: stream-cdc
   labels:
-    app: my-app
+    app: stream-cdc
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: my-app
+      app: stream-cdc
   template:
     metadata:
       labels:
-        app: my-app
+        app: stream-cdc
     spec:
       containers:
       - name: stream-cdc
-        image: your-image:tag  
+        image: sykescottages/stream-cdc:latest
         envFrom:
         - secretRef:
             name: stream-cdc-secret
