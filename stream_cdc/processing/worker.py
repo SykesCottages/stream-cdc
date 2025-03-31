@@ -13,6 +13,7 @@ class Worker:
 
     def run(self) -> None:
         try:
+            logger.info("Worker Started")
             self.data_source.connect()
             logger.info("Connected to data source")
             while self.running:

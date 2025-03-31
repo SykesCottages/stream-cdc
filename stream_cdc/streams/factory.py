@@ -1,13 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional, ClassVar, Type
 import boto3
 import json
+import os
 from stream_cdc.utils.logger import logger
-from stream_cdc.utils.exceptions import UnsupportedTypeError, StreamError
-from stream_cdc.config.loader import SQSConfig, ConfigLoader
+from stream_cdc.utils.exceptions import UnsupportedTypeError, StreamError, ConfigurationError
 
 
 class Stream(ABC):
+    """Base abstract class for all stream implementations."""
+
     @abstractmethod
     def send(self, messages: List[Any]) -> None:
         """Send messages to the stream destination."""
@@ -25,10 +27,46 @@ class SQS(Stream):
     # SQS has a hard limit of 10 messages per batch
     SQS_MAX_BATCH_SIZE = 10
 
-    def __init__(self, config: SQSConfig):
+    def __init__(
+        self,
+        queue_url: Optional[str] = None,
+        region: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None
+    ):
         """Initialize the SQS stream with configuration."""
-        self._client = self._create_client(config)
-        self._queue_url = config.queue_url
+        self.queue_url = queue_url or os.getenv("SQS_QUEUE_URL")
+        if not self.queue_url:
+            raise ConfigurationError("SQS_QUEUE_URL is required")
+
+        self.region = region or os.getenv("AWS_REGION")
+        if not self.region:
+            raise ConfigurationError("AWS_REGION is required")
+
+        self.endpoint_url = endpoint_url or os.getenv("AWS_ENDPOINT_URL")
+        if not self.endpoint_url:
+            raise ConfigurationError("AWS_ENDPOINT_URL is required")
+
+        self.aws_access_key_id = aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID")
+        if not self.aws_access_key_id:
+            raise ConfigurationError("AWS_ACCESS_KEY_ID is required")
+
+        self.aws_secret_access_key = aws_secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY", "")
+        if not self.aws_secret_access_key:
+            raise ConfigurationError("AWS_SECRET_ACCESS_KEY is required")
+
+        self._client = self._create_client()
+
+    def _create_client(self) -> Any:
+        """Create and configure the boto3 SQS client."""
+        return boto3.client(
+            "sqs",
+            region_name=self.region,
+            endpoint_url=self.endpoint_url,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        )
 
     def send(self, messages: List[Any]) -> None:
         """Send messages to SQS, respecting SQS batch size limits."""
@@ -46,16 +84,6 @@ class SQS(Stream):
         """No resources to close for SQS."""
         pass
 
-    def _create_client(self, config: SQSConfig) -> Any:
-        """Create and configure the boto3 SQS client."""
-        return boto3.client(
-            "sqs",
-            region_name=config.region,
-            endpoint_url=config.endpoint_url,
-            aws_access_key_id=config.aws_access_key_id,
-            aws_secret_access_key=config.aws_secret_access_key,
-        )
-
     def _prepare_sqs_entries(self, batch: List[Any]) -> List[Dict]:
         """Convert messages to SQS batch entry format."""
         entries = []
@@ -63,7 +91,7 @@ class SQS(Stream):
         for idx, msg in enumerate(batch):
             try:
                 message_body = json.dumps(msg)
-                # Check if message exceeds SQS size limit (256KB)
+                #  SQS size has playload size limit of 256KB
                 if len(message_body.encode("utf-8")) > 256 * 1024:
                     logger.error(f"Message size exceeds SQS limit of 256KB: {msg}")
                     raise StreamError("Message size exceeds SQS limit of 256KB")
@@ -78,7 +106,7 @@ class SQS(Stream):
 
     def _send_batch_to_sqs(self, entries: List[Dict]) -> None:
         """Send a batch of messages to SQS."""
-        response = self._client.send_message_batch(QueueUrl=self._queue_url, Entries=entries)
+        response = self._client.send_message_batch(QueueUrl=self.queue_url, Entries=entries)
 
         if "Failed" in response and response["Failed"]:
             failed_count = len(response["Failed"])
@@ -90,20 +118,33 @@ class SQS(Stream):
 class StreamFactory:
     """Factory for creating Stream implementations."""
 
-    def __init__(self, config_loader: ConfigLoader):
-        """Initialize with a configuration loader."""
-        self.config_loader = config_loader
-        self.supported_types = ["sqs"]
+    REGISTRY: ClassVar[Dict[str, Type[Stream]]] = {
+        "sqs": SQS,
+    }
 
-    def create(self, stream_type: str) -> Stream:
-        """Create a Stream implementation based on requested type."""
+    @classmethod
+    def create(cls, stream_type: str, **kwargs) -> Stream:
+        """
+        Create a Stream implementation based on requested type.
+
+        Args:
+            stream_type: The type of stream to create
+            **kwargs: Configuration parameters to pass to the stream implementation
+
+        Returns:
+            An initialized Stream implementation
+
+        Raises:
+            UnsupportedTypeError: If the requested stream type is not supported
+        """
         normalized_type = stream_type.lower()
         logger.debug(f"Creating stream of type: {normalized_type}")
 
-        match normalized_type:
-            case "sqs":
-                config = self.config_loader.load_stream_config(normalized_type)
-                return SQS(config)
-            case _:
-                logger.error(f"Unsupported stream type: {stream_type}. Supported types: {self.supported_types}")
-                raise UnsupportedTypeError(f"Unhandled stream type: {stream_type}")
+        if normalized_type not in cls.REGISTRY:
+            supported = list(cls.REGISTRY.keys())
+            logger.error(f"Unsupported stream type: {stream_type}. Supported types: {supported}")
+            raise UnsupportedTypeError(f"Unsupported stream type: {stream_type}. Supported types: {supported}")
+
+        stream_class = cls.REGISTRY[normalized_type]
+        return stream_class(**kwargs)
+
