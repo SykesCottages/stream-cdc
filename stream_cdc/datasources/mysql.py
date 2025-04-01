@@ -1,4 +1,5 @@
 from typing import Generator, Any, Dict, Optional, Union
+from datetime import datetime, timezone
 import os
 import pymysql
 from pymysqlreplication import BinLogStreamReader
@@ -110,6 +111,8 @@ class MySQLSettingsValidator:
 class MySQLDataSource(DataSource):
     """MySQL binlog implementation of the DataSource interface."""
 
+    SCHEMA_VERSION = "mysql-31-03-2025"
+
     def __init__(
         self,
         host: Optional[str] = None,
@@ -150,6 +153,13 @@ class MySQLDataSource(DataSource):
             logger.error(f"MySQL settings validation failed: {e}")
             raise
 
+    def _create_event_schema(self, metadata: dict, spec: dict):
+        return {
+            "version": self.SCHEMA_VERSION,
+            "metadata": metadata,
+            "spec": spec
+        }
+
     def connect(self) -> None:
         logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
 
@@ -178,6 +188,20 @@ class MySQLDataSource(DataSource):
         if not self.client:
             raise DataSourceError("Data source not connected")
 
+        def get_event_type(event) -> str:
+            match event:
+                case WriteRowsEvent():
+                    return "Insert"
+
+                case UpdateRowsEvent():
+                    return "Update"
+
+                case DeleteRowsEvent():
+                    return "Delete"
+
+                case _:
+                    return type(event).__name__
+
         try:
             for event in self.client:
                 if isinstance(event, GtidEvent):
@@ -186,20 +210,27 @@ class MySQLDataSource(DataSource):
                     continue
 
                 for row in event.rows:
-                    logger.debug(
-                        f"event: {type(event).__name__}, "
-                        f"payload: {row}, "
-                        f"schema: {event.schema}, "
-                        f"table: {event.table}, "
-                        f"gtid: {self.current_gtid}"
-                    )
-                    yield {
-                        "schema": event.schema,
-                        "table": event.table,
-                        "type": type(event).__name__,
-                        "row": row,
-                        "gtid": self.current_gtid,
+                    metadata = {
+                        "datasource_type": "mysql",
+                        "source": self.host,
+                        "timestamp": datetime.now(timezone.utc)
                     }
+
+                    spec = {
+                        "database": event.schema,
+                        "table": event.table,
+                        "event_type": get_event_type(event),
+                        "row": row,
+                        "gtid": self.current_gtid
+                    }
+
+                    output = self._create_event_schema(metadata, spec)
+                    logger.debug(
+                        f"Event: {output}"
+                    )
+
+                    yield output
+
         except Exception as e:
             error_msg = f"Error while listening to MySQL binlog: {str(e)}"
             logger.error(error_msg)
