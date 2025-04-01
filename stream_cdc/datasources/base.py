@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Any, Dict
 
-
 class DataSource(ABC):
     """Base abstract class for all data source implementations."""
 

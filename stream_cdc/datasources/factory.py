@@ -1,4 +1,4 @@
-from typing import Dict, ClassVar, Type, Any
+from typing import Dict, ClassVar, Type
 
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.utils.logger import logger
