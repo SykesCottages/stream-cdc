@@ -5,18 +5,24 @@ from stream_cdc.streams.base import Stream
 
 
 class StreamFactory:
-    """Factory for creating Stream implementations."""
+    """
+    Factory for creating Stream implementations.
+
+    This class provides a registry-based factory pattern for creating instances
+    of Stream implementations based on a specified type. New stream types can be
+    registered with the factory to make them available for creation.
+    """
 
     REGISTRY: ClassVar[Dict[str, Type[Stream]]] = {}
 
     @classmethod
     def register_stream(cls, name: str, datasource_class: Type[Stream]) -> None:
         """
-        Register a data source implementation.
+        Register a stream implementation.
 
         Args:
-            name: The name to register the data source under
-            datasource_class: The data source class to register
+            name (str): The name to register the stream under.
+            datasource_class (Type[Stream]): The stream class to register.
         """
         cls.REGISTRY[name.lower()] = datasource_class
 
@@ -26,14 +32,14 @@ class StreamFactory:
         Create a Stream implementation based on requested type.
 
         Args:
-            stream_type: The type of stream to create
-            **kwargs: Configuration parameters to pass to the stream implementation
+            stream_type (str): The type of stream to create.
+            **kwargs: Configuration parameters to pass to the stream implementation.
 
         Returns:
-            An initialized Stream implementation
+            Stream: An initialized Stream implementation.
 
         Raises:
-            UnsupportedTypeError: If the requested stream type is not supported
+            UnsupportedTypeError: If the requested stream type is not supported.
         """
         normalized_type = stream_type.lower()
         logger.debug(f"Creating stream of type: {normalized_type}")
