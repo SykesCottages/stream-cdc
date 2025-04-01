@@ -24,14 +24,17 @@ jobs:
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-    - name: Install dependencies with uv
+    - name: Create virtual environment and install dependencies
       run: |
-        uv pip install --upgrade pip
-        if [ -f pyproject.toml ]; then uv pip install -e ".[dev]"; fi
+        uv venv
+        source .venv/bin/activate
         uv pip install pytest pytest-cov
+        if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi
+        if [ -f pyproject.toml ]; then uv pip install -e ".[dev]"; fi
 
     - name: Run tests
       run: |
+        source .venv/bin/activate
         pytest tests/unit -v --cov=stream_cdc --cov-report=xml
 
     - name: Upload coverage to Codecov
@@ -39,3 +42,4 @@ jobs:
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
