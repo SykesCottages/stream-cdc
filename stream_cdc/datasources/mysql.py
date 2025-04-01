@@ -12,7 +12,12 @@ from stream_cdc.utils.exceptions import DataSourceError, ConfigurationError
 
 
 class MySQLSettingsValidator:
-    """Private validator for MySQL CDC settings."""
+    """
+    Private validator for MySQL CDC settings.
+
+    This class validates that the MySQL server has the required settings for
+    Change Data Capture (CDC), such as binlog format, GTID mode, etc.
+    """
 
     def __init__(
         self,
@@ -21,6 +26,18 @@ class MySQLSettingsValidator:
         password: Union[str, None],
         port: Union[int, None]
     ):
+        """
+        Initialize the validator with MySQL connection parameters.
+
+        Args:
+            host (Union[str, None]): The MySQL host.
+            user (Union[str, None]): The MySQL user.
+            password (Union[str, None]): The MySQL password.
+            port (Union[int, None]): The MySQL port.
+
+        Raises:
+            ConfigurationError: If any required parameter is missing.
+        """
         if not host:
             raise ConfigurationError("Database host is required for validation")
         if not user:
@@ -36,7 +53,12 @@ class MySQLSettingsValidator:
         self.port = port
 
     def _get_required_settings(self) -> Dict[str, str]:
-        """Return the dictionary of required settings and their expected values."""
+        """
+        Return the dictionary of required settings and their expected values.
+
+        Returns:
+            Dict[str, str]: A dictionary mapping setting names to their expected values.
+        """
         return {
             "binlog_format": "ROW",
             "binlog_row_metadata": "FULL",
@@ -46,7 +68,15 @@ class MySQLSettingsValidator:
         }
 
     def _fetch_actual_settings(self, cursor) -> Dict[str, str]:
-        """Fetch the actual settings from the database."""
+        """
+        Fetch the actual settings from the database.
+
+        Args:
+            cursor: The database cursor to execute queries with.
+
+        Returns:
+            Dict[str, str]: A dictionary mapping setting names to their actual values.
+        """
         required_settings = self._get_required_settings()
 
         var_query = "SHOW GLOBAL VARIABLES WHERE Variable_name IN (%s)"
@@ -61,7 +91,15 @@ class MySQLSettingsValidator:
         return actual_settings
 
     def _verify_settings(self, actual_settings: Dict[str, str]) -> None:
-        """Verify that all required settings have the correct values."""
+        """
+        Verify that all required settings have the correct values.
+
+        Args:
+            actual_settings (Dict[str, str]): The actual settings from the database.
+
+        Raises:
+            ConfigurationError: If any setting is missing or has an incorrect value.
+        """
         required_settings = self._get_required_settings()
 
         for setting, expected in required_settings.items():
@@ -81,7 +119,15 @@ class MySQLSettingsValidator:
             logger.info(f"MySQL setting {setting} is correctly set to {actual}")
 
     def validate(self) -> None:
-        """Validate that MySQL has all the required settings for CDC."""
+        """
+        Validate that MySQL has all the required settings for CDC.
+
+        Connects to the MySQL server, fetches the actual settings, and verifies
+        that they match the required settings.
+
+        Raises:
+            ConfigurationError: If validation fails.
+        """
         try:
             conn = pymysql.connect(
                 host=self.host,
@@ -109,7 +155,13 @@ class MySQLSettingsValidator:
 
 
 class MySQLDataSource(DataSource):
-    """MySQL binlog implementation of the DataSource interface."""
+    """
+    MySQL binlog implementation of the DataSource interface.
+
+    This class connects to a MySQL server and listens for changes to the binlog,
+    which records all data modifications. It produces a stream of events representing
+    inserts, updates, and deletes.
+    """
 
     SCHEMA_VERSION = "mysql-31-03-2025"
 
@@ -121,6 +173,19 @@ class MySQLDataSource(DataSource):
         port: Optional[int] = None,
         server_id: int = 1234
     ):
+        """
+        Initialize the MySQL data source with connection parameters.
+
+        Args:
+            host (Optional[str]): The MySQL host. Defaults to DB_HOST environment variable.
+            user (Optional[str]): The MySQL user. Defaults to DB_USER environment variable.
+            password (Optional[str]): The MySQL password. Defaults to DB_PASSWORD environment variable.
+            port (Optional[int]): The MySQL port. Defaults to DB_PORT environment variable or 3306.
+            server_id (int): The server ID to use when connecting to the binlog. Defaults to 1234.
+
+        Raises:
+            ConfigurationError: If any required parameter is missing.
+        """
         self.host = host or os.getenv("DB_HOST")
         if not self.host:
             raise ConfigurationError("DB_HOST is required")
@@ -140,7 +205,12 @@ class MySQLDataSource(DataSource):
         self.current_gtid = None
 
     def _validate_settings(self) -> None:
-        """Validate MySQL settings required for CDC."""
+        """
+        Validate MySQL settings required for CDC.
+
+        Raises:
+            ConfigurationError: If validation fails.
+        """
         try:
             validator = MySQLSettingsValidator(
                 host=self.host,
@@ -154,6 +224,16 @@ class MySQLDataSource(DataSource):
             raise
 
     def _create_event_schema(self, metadata: dict, spec: dict):
+        """
+        Create a standardized event schema from metadata and specification.
+
+        Args:
+            metadata (dict): The event metadata, such as source and timestamp.
+            spec (dict): The event specification, such as database, table, and row data.
+
+        Returns:
+            dict: The structured event schema.
+        """
         return {
             "version": self.SCHEMA_VERSION,
             "metadata": metadata,
@@ -161,6 +241,14 @@ class MySQLDataSource(DataSource):
         }
 
     def connect(self) -> None:
+        """
+        Connect to the MySQL binlog stream.
+
+        Validates the MySQL settings and initializes the binlog client.
+
+        Raises:
+            DataSourceError: If connection fails.
+        """
         logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
 
         self._validate_settings()
@@ -185,6 +273,18 @@ class MySQLDataSource(DataSource):
             raise DataSourceError(error_msg)
 
     def listen(self) -> Generator[Dict[str, Any], None, None]:
+        """
+        Listen for changes in the MySQL binlog.
+
+        Yields events for each row change (insert, update, delete) in the binlog.
+        Tracks the current GTID for event correlation.
+
+        Yields:
+            Dict[str, Any]: A structured event representing a row change.
+
+        Raises:
+            DataSourceError: If not connected or if an error occurs while listening.
+        """
         if not self.client:
             raise DataSourceError("Data source not connected")
 
@@ -237,6 +337,11 @@ class MySQLDataSource(DataSource):
             raise DataSourceError(error_msg)
 
     def disconnect(self) -> None:
+        """
+        Disconnect from the MySQL binlog stream.
+
+        Closes the binlog client if it exists.
+        """
         if not self.client:
             return
 
