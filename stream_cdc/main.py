@@ -11,6 +11,17 @@ from stream_cdc.processing.worker import Worker
 from stream_cdc.config.loader import AppConfig
 
 def main() -> None:
+    """
+    Main entry point for the stream-cdc application.
+
+    This function initializes the application, including loading the configuration,
+    setting up the logger, creating the stream, serializer, processor, data source,
+    and worker. It also sets up signal handlers for graceful shutdown and starts
+    the worker.
+
+    The function does not return under normal operation; it continues running until
+    a shutdown signal is received.
+    """
     load_dotenv()
 
     logger_instance = Logger(log_level="INFO")
@@ -33,6 +44,16 @@ def main() -> None:
     worker = Worker(datasource, processor)
 
     def signal_handler(sig: Any, _frame: Any) -> None:
+        """
+        Handle operating system signals for graceful shutdown.
+
+        This function is called when the application receives a shutdown signal
+        (e.g., SIGINT, SIGTERM). It logs the event and stops the worker.
+
+        Args:
+            sig (Any): The signal received.
+            _frame (Any): The current stack frame (unused).
+        """
         logger.info("Shutdown signal received")
         worker.stop()
 
@@ -44,3 +65,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
