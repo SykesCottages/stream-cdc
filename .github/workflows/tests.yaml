@@ -24,13 +24,30 @@ jobs:
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+    - name: Cache uv virtual environment
+      uses: actions/cache@v3
+      id: venv-cache
+      with:
+        path: |
+          .venv
+          ~/.cache/uv
+        key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml', '**/requirements.txt', '**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-venv-${{ matrix.python-version }}-
+
     - name: Create virtual environment and install dependencies
+      if: steps.venv-cache.outputs.cache-hit != 'true'
       run: |
         uv venv
         source .venv/bin/activate
         uv pip install pytest pytest-cov
         if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi
         if [ -f pyproject.toml ]; then uv pip install -e ".[dev]"; fi
+
+    - name: Install package in development mode
+      run: |
+        source .venv/bin/activate
+        uv pip install -e .
 
     - name: Run tests
       run: |
