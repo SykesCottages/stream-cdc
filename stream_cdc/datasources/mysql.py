@@ -240,6 +240,9 @@ class MySQLDataSource(DataSource):
             "spec": spec
         }
 
+    def _keep_track(self):
+        pass
+
     def connect(self) -> None:
         """
         Connect to the MySQL binlog stream.
