@@ -8,7 +8,13 @@ from typing import List, Any, Dict, Optional
 
 
 class SQS(Stream):
-    """AWS SQS implementation of the Stream interface."""
+    """
+    AWS SQS implementation of the Stream interface.
+
+    This class provides functionality to send messages to an AWS Simple Queue Service
+    (SQS) queue. It handles batch sending, respecting SQS's limits on batch size and
+    message size.
+    """
 
     # SQS has a hard limit of 10 messages per batch
     SQS_MAX_BATCH_SIZE = 10
@@ -21,7 +27,19 @@ class SQS(Stream):
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None
     ):
-        """Initialize the SQS stream with configuration."""
+        """
+        Initialize the SQS stream with configuration.
+
+        Args:
+            queue_url (Optional[str]): The URL of the SQS queue. Defaults to SQS_QUEUE_URL environment variable.
+            region (Optional[str]): The AWS region. Defaults to AWS_REGION environment variable.
+            endpoint_url (Optional[str]): The AWS endpoint URL. Defaults to AWS_ENDPOINT_URL environment variable.
+            aws_access_key_id (Optional[str]): The AWS access key ID. Defaults to AWS_ACCESS_KEY_ID environment variable.
+            aws_secret_access_key (Optional[str]): The AWS secret access key. Defaults to AWS_SECRET_ACCESS_KEY environment variable.
+
+        Raises:
+            ConfigurationError: If any required configuration parameter is missing.
+        """
         self.queue_url = queue_url or os.getenv("SQS_QUEUE_URL")
         if not self.queue_url:
             raise ConfigurationError("SQS_QUEUE_URL is required")
@@ -45,7 +63,12 @@ class SQS(Stream):
         self._client = self._create_client()
 
     def _create_client(self) -> Any:
-        """Create and configure the boto3 SQS client."""
+        """
+        Create and configure the boto3 SQS client.
+
+        Returns:
+            Any: The configured boto3 SQS client.
+        """
         return boto3.client(
             "sqs",
             region_name=self.region,
@@ -55,7 +78,18 @@ class SQS(Stream):
         )
 
     def send(self, messages: List[Any]) -> None:
-        """Send messages to SQS, respecting SQS batch size limits."""
+        """
+        Send messages to SQS, respecting SQS batch size limits.
+
+        Batches messages according to SQS's limitations (maximum of 10 messages per batch)
+        and sends them to the configured queue.
+
+        Args:
+            messages (List[Any]): The messages to send. Each message should be serializable to JSON.
+
+        Raises:
+            StreamError: If message conversion or sending fails.
+        """
         if not messages:
             return
 
@@ -67,11 +101,30 @@ class SQS(Stream):
             self._send_batch_to_sqs(entries)
 
     def close(self) -> None:
-        """No resources to close for SQS."""
+        """
+        No resources to close for SQS.
+
+        This method is implemented to satisfy the Stream interface but does not
+        perform any action as SQS does not maintain persistent connections.
+        """
         pass
 
     def _prepare_sqs_entries(self, batch: List[Any]) -> List[Dict]:
-        """Convert messages to SQS batch entry format."""
+        """
+        Convert messages to SQS batch entry format.
+
+        Formats each message as required by the SQS send_message_batch API,
+        including setting a unique ID for each message in the batch.
+
+        Args:
+            batch (List[Any]): The batch of messages to format.
+
+        Returns:
+            List[Dict]: The formatted messages ready for sending to SQS.
+
+        Raises:
+            StreamError: If a message cannot be converted to JSON or exceeds SQS size limits.
+        """
         entries = []
 
         for idx, msg in enumerate(batch):
@@ -91,7 +144,15 @@ class SQS(Stream):
         return entries
 
     def _send_batch_to_sqs(self, entries: List[Dict]) -> None:
-        """Send a batch of messages to SQS."""
+        """
+        Send a batch of messages to SQS.
+
+        Args:
+            entries (List[Dict]): The formatted messages to send.
+
+        Raises:
+            StreamError: If any messages fail to send.
+        """
         response = self._client.send_message_batch(QueueUrl=self.queue_url, Entries=entries)
 
         if "Failed" in response and response["Failed"]:

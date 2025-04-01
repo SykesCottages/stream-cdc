@@ -5,7 +5,12 @@ from stream_cdc.utils.logger import logger
 
 @dataclass
 class AppConfig(object):
-    """Application-wide configuration."""
+    """
+    Application-wide configuration.
+
+    This class represents the configuration for the entire application,
+    including logging level, batch size, and flush interval.
+    """
 
     log_level: str
     batch_size: int
@@ -17,7 +22,8 @@ class AppConfig(object):
         Create an AppConfig instance from environment variables.
 
         Returns:
-            AppConfig: Configured instance
+            AppConfig: Configured instance with values from environment variables
+                      or defaults if the environment variables are not set.
         """
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         batch_size = int(os.getenv("BATCH_SIZE", "10"))
@@ -30,3 +36,4 @@ class AppConfig(object):
             batch_size=batch_size,
             flush_interval=flush_interval,
         )
+
