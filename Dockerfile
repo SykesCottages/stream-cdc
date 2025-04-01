@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Installing separately from its dependencies allows optimal layer caching
 COPY pyproject.toml uv.lock ./
 COPY stream_cdc ./stream_cdc
-COPY README.md
+COPY README.md README.md
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
