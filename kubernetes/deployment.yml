@@ -5,6 +5,7 @@ metadata:
   name: stream-cdc
   labels:
     app: stream-cdc
+    version: stream-cdc
 spec:
   replicas: 1
   selector:
