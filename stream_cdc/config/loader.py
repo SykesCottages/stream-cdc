@@ -29,11 +29,12 @@ class AppConfig(object):
         batch_size = int(os.getenv("BATCH_SIZE", "10"))
         flush_interval = float(os.getenv("FLUSH_INTERVAL", "5.0"))
 
-        logger.info(f"Config: log_level={log_level}, batch_size={batch_size}, interval={flush_interval}")
+        logger.info(
+            f"Config: log_level={log_level}, batch_size={batch_size}, interval={flush_interval}"
+        )
 
         return cls(
             log_level=log_level,
             batch_size=batch_size,
             flush_interval=flush_interval,
         )
-

@@ -4,13 +4,12 @@ services:
     env_file:
       - .env
     environment:
-      - SERVICES=sqs
+      - SERVICES=sqs,dynamodb
       - EDGE_PORT=4566
     ports:
       - "4566:4566"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-
   mysql:
     image: mysql:8.0
     env_file:
@@ -28,7 +27,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-
   app:
     build: .
     working_dir: /app
@@ -58,6 +56,5 @@ services:
         uv sync &&
         watchmedo auto-restart --recursive --directory=stream_cdc --patterns='**/*.py' --no-restart-on-command-exit -- python -m stream_cdc.main
       "
-
 volumes:
   mysql_data:

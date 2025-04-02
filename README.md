@@ -49,3 +49,9 @@ uv venv --python $(pyenv which python)
 uv sync
 source .venv/bin/activate
 ```
+## Running tests
+
+Make sure you have your venv setup correctly before running tests
+```
+pytest tests/unit -v
+```

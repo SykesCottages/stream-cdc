@@ -94,4 +94,3 @@ def test_create_unsupported_stream_with_registered_types():
 
     # Error should list available types
     assert "Supported types: ['mock1', 'mock2']" in str(exc_info.value)
-
