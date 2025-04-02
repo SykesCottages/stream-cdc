@@ -4,6 +4,7 @@ metadata:
   name: stream-cdc-config
   labels:
     app: stream-cdc
+    version: stream-cdc
 data:
   APP_NAME: "stream-cdc"
   DB_USER: "admin"

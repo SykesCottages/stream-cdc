@@ -1,10 +1,13 @@
 from typing import Generator, Any, Dict, Optional, Union
-from datetime import datetime, timezone
 import os
 import pymysql
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent
-from pymysqlreplication.row_event import DeleteRowsEvent, UpdateRowsEvent, WriteRowsEvent
+from pymysqlreplication.row_event import (
+    DeleteRowsEvent,
+    UpdateRowsEvent,
+    WriteRowsEvent,
+)
 
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.utils.logger import logger
@@ -24,7 +27,7 @@ class MySQLSettingsValidator:
         host: Union[str, None],
         user: Union[str, None],
         password: Union[str, None],
-        port: Union[int, None]
+        port: Union[int, None],
     ):
         """
         Initialize the validator with MySQL connection parameters.
@@ -43,7 +46,9 @@ class MySQLSettingsValidator:
         if not user:
             raise ConfigurationError("Database user is required for validation")
         if not password:
-            raise ConfigurationError("Database password is required for validation")
+            raise ConfigurationError(
+                "Database password is required for validation"
+            )
         if not port:
             raise ConfigurationError("Database port is required for validation")
 
@@ -64,7 +69,7 @@ class MySQLSettingsValidator:
             "binlog_row_metadata": "FULL",
             "binlog_row_image": "FULL",
             "gtid_mode": "ON",
-            "enforce_gtid_consistency": "ON"
+            "enforce_gtid_consistency": "ON",
         }
 
     def _fetch_actual_settings(self, cursor) -> Dict[str, str]:
@@ -106,11 +111,15 @@ class MySQLSettingsValidator:
             actual = actual_settings.get(setting)
 
             if actual is None:
-                logger.error(f"MySQL setting {setting} not found in server variables")
+                logger.error(
+                    f"MySQL setting {setting} not found in server variables"
+                )
                 raise ConfigurationError(f"MySQL setting {setting} not found")
 
             if actual.upper() != expected.upper():
-                logger.error(f"MySQL setting {setting} is set to {actual}, expected {expected}")
+                logger.error(
+                    f"MySQL setting {setting} is set to {actual}, expected {expected}"
+                )
                 raise ConfigurationError(f"""
                     MySQL setting {setting} is incorrect: expected={expected},
                     actual={actual}
@@ -133,7 +142,7 @@ class MySQLSettingsValidator:
                 host=self.host,
                 user=self.user,
                 password=self.password,
-                port=self.port
+                port=self.port,
             )
 
             with conn.cursor() as cursor:
@@ -171,7 +180,7 @@ class MySQLDataSource(DataSource):
         user: Optional[str] = None,
         password: Optional[str] = None,
         port: Optional[int] = None,
-        server_id: int = 1234
+        server_id: int = 1234,
     ):
         """
         Initialize the MySQL data source with connection parameters.
@@ -216,7 +225,7 @@ class MySQLDataSource(DataSource):
                 host=self.host,
                 user=self.user,
                 password=self.password,
-                port=self.port
+                port=self.port,
             )
             validator.validate()
         except Exception as e:
@@ -237,7 +246,7 @@ class MySQLDataSource(DataSource):
         return {
             "version": self.SCHEMA_VERSION,
             "metadata": metadata,
-            "spec": spec
+            "spec": spec,
         }
 
     def _keep_track(self):
@@ -267,7 +276,12 @@ class MySQLDataSource(DataSource):
                 server_id=self.server_id,
                 blocking=True,
                 resume_stream=True,
-                only_events=[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, GtidEvent],
+                only_events=[
+                    WriteRowsEvent,
+                    UpdateRowsEvent,
+                    DeleteRowsEvent,
+                    GtidEvent,
+                ],
             )
             logger.info("Connected to MySQL binlog stream")
         except Exception as e:
@@ -316,7 +330,7 @@ class MySQLDataSource(DataSource):
                     metadata = {
                         "datasource_type": "mysql",
                         "source": self.host,
-                        "timestamp": datetime.now(timezone.utc)
+                        "timestamp": event.timestamp,
                     }
 
                     spec = {
@@ -324,13 +338,11 @@ class MySQLDataSource(DataSource):
                         "table": event.table,
                         "event_type": get_event_type(event),
                         "row": row,
-                        "gtid": self.current_gtid
+                        "gtid": self.current_gtid,
                     }
 
                     output = self._create_event_schema(metadata, spec)
-                    logger.debug(
-                        f"Event: {output}"
-                    )
+                    logger.debug(f"Event: {output}")
 
                     yield output
 
@@ -355,4 +367,3 @@ class MySQLDataSource(DataSource):
             logger.error(f"Error while disconnecting from MySQL: {e}")
         finally:
             self.client = None
-

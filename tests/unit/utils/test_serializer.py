@@ -38,6 +38,7 @@ def test_serialize_with_datetime(serializer):
 
 def test_serialize_custom_object(serializer):
     """Test serializing a custom object that can't be JSON serialized."""
+
     class CustomObject:
         # This class doesn't have a proper JSON representation
         pass
@@ -60,6 +61,8 @@ def test_serialize_custom_object(serializer):
     # If it was serialized as a dict, the 'object' key should be a string
     elif isinstance(result, dict) and "object" in result:
         assert isinstance(result["object"], str)
+
+
 def test_serialize_array(serializer):
     """Test serializing an array."""
     data = [1, 2, 3, "test"]
@@ -71,15 +74,9 @@ def test_serialize_complex_nested_structure(serializer):
     """Test serializing a complex nested structure."""
     data = {
         "level1": {
-            "level2": {
-                "level3": [
-                    {"key": "value1"},
-                    {"key": "value2"}
-                ]
-            }
+            "level2": {"level3": [{"key": "value1"}, {"key": "value2"}]}
         },
-        "numbers": [1, 2, 3]
+        "numbers": [1, 2, 3],
     }
     result = serializer.serialize(data)
     assert result == data
-

@@ -14,7 +14,9 @@ class Logger:
 
     _instance = None
 
-    def __init__(self, log_level: str = "INFO", logger_name: Optional[str] = None):
+    def __init__(
+        self, log_level: str = "INFO", logger_name: Optional[str] = None
+    ):
         """
         Initialize the logger with a specific log level and optional name.
 
@@ -28,7 +30,9 @@ class Logger:
         self.logger.handlers.clear()
 
         console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
         self.logger.addHandler(console_handler)
 
         self.set_level(log_level)
@@ -76,4 +80,3 @@ class Logger:
 
 
 logger = Logger.get_logger()
-

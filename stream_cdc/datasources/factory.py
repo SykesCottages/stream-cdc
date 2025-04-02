@@ -16,7 +16,9 @@ class DataSourceFactory:
     REGISTRY: ClassVar[Dict[str, Type[DataSource]]] = {}
 
     @classmethod
-    def register_datasource(cls, name: str, datasource_class: Type[DataSource]) -> None:
+    def register_datasource(
+        cls, name: str, datasource_class: Type[DataSource]
+    ) -> None:
         """
         Register a data source implementation.
 
@@ -46,9 +48,12 @@ class DataSourceFactory:
 
         if normalized_type not in cls.REGISTRY:
             supported = list(cls.REGISTRY.keys())
-            logger.error(f"Unsupported data source type: {datasource_type}. Supported types: {supported}")
-            raise UnsupportedTypeError(f"Unsupported data source type: {datasource_type}. Supported types: {supported}")
+            logger.error(
+                f"Unsupported data source type: {datasource_type}. Supported types: {supported}"
+            )
+            raise UnsupportedTypeError(
+                f"Unsupported data source type: {datasource_type}. Supported types: {supported}"
+            )
 
         datasource_class = cls.REGISTRY[normalized_type]
         return datasource_class(**kwargs)
-
