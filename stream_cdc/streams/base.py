@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Any
 
+
 class Stream(ABC):
     """
     Base abstract class for all stream implementations.
@@ -35,4 +36,3 @@ class Stream(ABC):
             StreamError: If the close operation fails.
         """
         pass
-

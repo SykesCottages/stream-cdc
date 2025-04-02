@@ -14,7 +14,9 @@ class Worker:
     eventual delivery to a stream.
     """
 
-    def __init__(self, data_source: DataSource, processor: StreamProcessor) -> None:
+    def __init__(
+        self, data_source: DataSource, processor: StreamProcessor
+    ) -> None:
         """
         Initialize the worker with a data source and processor.
 
@@ -65,4 +67,3 @@ class Worker:
         self.running = False
         time.sleep(2)
         exit(0)
-

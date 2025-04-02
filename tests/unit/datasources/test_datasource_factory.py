@@ -97,4 +97,3 @@ def test_create_unsupported_datasource_with_registered_types():
 
     # Error should list available types
     assert "Supported types: ['mysql', 'postgres']" in str(exc_info.value)
-

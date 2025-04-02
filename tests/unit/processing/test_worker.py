@@ -13,7 +13,7 @@ def mock_data_source():
     data_source.listen.return_value = [
         {"id": 1, "type": "insert"},
         {"id": 2, "type": "update"},
-        {"id": 3, "type": "delete"}
+        {"id": 3, "type": "delete"},
     ]
 
     return data_source
@@ -40,6 +40,7 @@ def test_worker_init(worker, mock_data_source, mock_processor):
 
 def test_run_stop_flow(worker, mock_data_source, mock_processor):
     """Test run method with normal stop flow."""
+
     # Configure the worker to stop after processing
     def stop_worker(*args, **kwargs):
         worker.running = False
@@ -100,11 +101,12 @@ def test_run_process_multiple_events(worker, mock_data_source, mock_processor):
     # Verify correct number of events processed
     assert mock_processor.process.call_count == len(events)
 
+
 def test_stop(worker):
     """Test stop method."""
     # Mock the exit function to avoid actually exiting during test
-    with patch('stream_cdc.processing.worker.exit') as mock_exit:
-        with patch('stream_cdc.processing.worker.time.sleep') as mock_sleep:
+    with patch("stream_cdc.processing.worker.exit") as mock_exit:
+        with patch("stream_cdc.processing.worker.time.sleep") as mock_sleep:
             worker.stop()
 
             # Verify running flag was set to False
@@ -115,4 +117,3 @@ def test_stop(worker):
 
             # Verify worker exits with code 0
             mock_exit.assert_called_once_with(0)
-

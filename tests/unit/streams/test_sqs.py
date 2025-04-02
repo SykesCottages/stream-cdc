@@ -9,7 +9,7 @@ from stream_cdc.utils.exceptions import ConfigurationError, StreamError
 @pytest.fixture
 def mock_boto3():
     """Mock boto3 client for tests."""
-    with patch('boto3.client') as mock:
+    with patch("boto3.client") as mock:
         yield mock
 
 
@@ -30,7 +30,7 @@ def sqs_instance(mock_boto3, mock_sqs_client):
         region="test-region",
         endpoint_url="https://test-endpoint",
         aws_access_key_id="test-key-id",
-        aws_secret_access_key="test-secret-key"
+        aws_secret_access_key="test-secret-key",
     )
     return sqs
 
@@ -43,7 +43,7 @@ def sqs_env_vars():
         "AWS_REGION": "us-west-2",
         "AWS_ENDPOINT_URL": "https://sqs.us-west-2.amazonaws.com",
         "AWS_ACCESS_KEY_ID": "test-key-id",
-        "AWS_SECRET_ACCESS_KEY": "test-secret-key"
+        "AWS_SECRET_ACCESS_KEY": "test-secret-key",
     }
     with patch.dict(os.environ, env_vars):
         yield env_vars
@@ -53,7 +53,10 @@ def test_init_from_env_vars(mock_boto3, sqs_env_vars):
     """Test initialization from environment variables."""
     sqs = SQS()
 
-    assert sqs.queue_url == "https://sqs.us-west-2.amazonaws.com/123456789012/test-queue"
+    assert (
+        sqs.queue_url
+        == "https://sqs.us-west-2.amazonaws.com/123456789012/test-queue"
+    )
     assert sqs.region == "us-west-2"
     assert sqs.endpoint_url == "https://sqs.us-west-2.amazonaws.com"
     assert sqs.aws_access_key_id == "test-key-id"
@@ -64,7 +67,7 @@ def test_init_from_env_vars(mock_boto3, sqs_env_vars):
         region_name="us-west-2",
         endpoint_url="https://sqs.us-west-2.amazonaws.com",
         aws_access_key_id="test-key-id",
-        aws_secret_access_key="test-secret-key"
+        aws_secret_access_key="test-secret-key",
     )
 
 
@@ -79,7 +82,9 @@ def test_init_with_missing_queue_url():
 
 def test_init_with_missing_region():
     """Test initialization with missing region."""
-    with patch.dict(os.environ, {"SQS_QUEUE_URL": "https://test-queue"}, clear=True):
+    with patch.dict(
+        os.environ, {"SQS_QUEUE_URL": "https://test-queue"}, clear=True
+    ):
         with pytest.raises(ConfigurationError) as exc_info:
             SQS()
 
@@ -88,10 +93,11 @@ def test_init_with_missing_region():
 
 def test_init_with_missing_endpoint():
     """Test initialization with missing endpoint URL."""
-    with patch.dict(os.environ, {
-        "SQS_QUEUE_URL": "https://test-queue",
-        "AWS_REGION": "us-west-2"
-    }, clear=True):
+    with patch.dict(
+        os.environ,
+        {"SQS_QUEUE_URL": "https://test-queue", "AWS_REGION": "us-west-2"},
+        clear=True,
+    ):
         with pytest.raises(ConfigurationError) as exc_info:
             SQS()
 
@@ -100,11 +106,15 @@ def test_init_with_missing_endpoint():
 
 def test_init_with_missing_access_key():
     """Test initialization with missing access key ID."""
-    with patch.dict(os.environ, {
-        "SQS_QUEUE_URL": "https://test-queue",
-        "AWS_REGION": "us-west-2",
-        "AWS_ENDPOINT_URL": "https://test-endpoint"
-    }, clear=True):
+    with patch.dict(
+        os.environ,
+        {
+            "SQS_QUEUE_URL": "https://test-queue",
+            "AWS_REGION": "us-west-2",
+            "AWS_ENDPOINT_URL": "https://test-endpoint",
+        },
+        clear=True,
+    ):
         with pytest.raises(ConfigurationError) as exc_info:
             SQS()
 
@@ -113,12 +123,16 @@ def test_init_with_missing_access_key():
 
 def test_init_with_missing_secret_key():
     """Test initialization with missing secret key."""
-    with patch.dict(os.environ, {
-        "SQS_QUEUE_URL": "https://test-queue",
-        "AWS_REGION": "us-west-2",
-        "AWS_ENDPOINT_URL": "https://test-endpoint",
-        "AWS_ACCESS_KEY_ID": "test-key-id"
-    }, clear=True):
+    with patch.dict(
+        os.environ,
+        {
+            "SQS_QUEUE_URL": "https://test-queue",
+            "AWS_REGION": "us-west-2",
+            "AWS_ENDPOINT_URL": "https://test-endpoint",
+            "AWS_ACCESS_KEY_ID": "test-key-id",
+        },
+        clear=True,
+    ):
         with pytest.raises(ConfigurationError) as exc_info:
             SQS()
 
@@ -132,7 +146,7 @@ def test_init_with_explicit_params(mock_boto3):
         region="custom-region",
         endpoint_url="https://custom-endpoint",
         aws_access_key_id="custom-key-id",
-        aws_secret_access_key="custom-secret-key"
+        aws_secret_access_key="custom-secret-key",
     )
 
     assert sqs.queue_url == "https://custom-queue-url"
@@ -182,11 +196,15 @@ def test_send_multiple_batches(sqs_instance, mock_sqs_client):
     assert mock_sqs_client.send_message_batch.call_count == 2
 
     # First batch should have 10 messages
-    first_batch = mock_sqs_client.send_message_batch.call_args_list[0][1]["Entries"]
+    first_batch = mock_sqs_client.send_message_batch.call_args_list[0][1][
+        "Entries"
+    ]
     assert len(first_batch) == 10
 
     # Second batch should have 5 messages
-    second_batch = mock_sqs_client.send_message_batch.call_args_list[1][1]["Entries"]
+    second_batch = mock_sqs_client.send_message_batch.call_args_list[1][1][
+        "Entries"
+    ]
     assert len(second_batch) == 5
 
 
@@ -203,6 +221,7 @@ def test_send_with_message_too_large(sqs_instance):
 
 def test_prepare_sqs_entries_json_error(sqs_instance):
     """Test handling error when a message can't be converted to JSON."""
+
     # Create a message that can't be JSON serialized
     class UnserializableObject:
         def __repr__(self):
@@ -222,7 +241,7 @@ def test_send_with_failed_messages(sqs_instance, mock_sqs_client):
     mock_sqs_client.send_message_batch.return_value = {
         "Failed": [
             {"Id": "0", "Message": "Error sending message"},
-            {"Id": "2", "Message": "Another error"}
+            {"Id": "2", "Message": "Another error"},
         ]
     }
 
@@ -239,4 +258,3 @@ def test_close_method(sqs_instance):
     """Test close method (should do nothing for SQS)."""
     # Should not raise any exception
     sqs_instance.close()
-
