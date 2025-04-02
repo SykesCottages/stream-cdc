@@ -1,7 +1,6 @@
 import pytest
 import os
-from unittest.mock import patch, MagicMock, call
-from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 from stream_cdc.datasources.mysql import MySQLDataSource, MySQLSettingsValidator
 from stream_cdc.utils.exceptions import ConfigurationError, DataSourceError
 from pymysqlreplication.event import GtidEvent
@@ -320,10 +319,12 @@ def test_mysql_datasource_init_missing_values():
 
 def test_create_event_schema(mysql_data_source):
     """Test creating event schema."""
+    # This is not really validating the schema... :S
+    # @ToDo Need to add a schema validator or a schema registry
     metadata = {
         "datasource_type": "mysql",
         "source": "localhost",
-        "timestamp": datetime.now(timezone.utc),
+        "timestamp": "1743598169"
     }
 
     spec = {
@@ -465,6 +466,7 @@ def test_listen_with_gtid_events(mysql_data_source):
     write_event = MagicMock(spec=WriteRowsEvent)
     write_event.schema = "testdb"
     write_event.table = "users"
+    write_event.timestamp = "1743598382"
     write_event.rows = [{"id": 1, "name": "Test User"}]
 
     # First yield a GTID event, then a row event
@@ -494,11 +496,13 @@ def test_listen_with_different_event_types(mysql_data_source):
     write_event = MagicMock(spec=WriteRowsEvent)
     write_event.schema = "testdb"
     write_event.table = "users"
+    write_event.timestamp = "1743598169"
     write_event.rows = [{"id": 1, "name": "New User"}]
 
     update_event = MagicMock(spec=UpdateRowsEvent)
     update_event.schema = "testdb"
     update_event.table = "users"
+    update_event.timestamp = "1743598169"
     update_event.rows = [
         ({"id": 1, "name": "Old User"}, {"id": 1, "name": "Updated User"})
     ]
@@ -506,6 +510,7 @@ def test_listen_with_different_event_types(mysql_data_source):
     delete_event = MagicMock(spec=DeleteRowsEvent)
     delete_event.schema = "testdb"
     delete_event.table = "users"
+    delete_event.timestamp = "1743598169"
     delete_event.rows = [{"id": 2, "name": "Deleted User"}]
 
     # Yield all event types
