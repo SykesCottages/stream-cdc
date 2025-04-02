@@ -14,7 +14,13 @@ class StreamProcessor:
     interval.
     """
 
-    def __init__(self, stream: Stream, serializer: Serializer, batch_size: int, flush_interval: float) -> None:
+    def __init__(
+        self,
+        stream: Stream,
+        serializer: Serializer,
+        batch_size: int,
+        flush_interval: float,
+    ) -> None:
         """
         Initialize the processor with a stream, serializer, and batching parameters.
 
@@ -45,7 +51,10 @@ class StreamProcessor:
         self.buffer.append(serialized_event)
         logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
 
-        if len(self.buffer) >= self.batch_size or time.time() - self.last_flush_time >= self.flush_interval:
+        if (
+            len(self.buffer) >= self.batch_size
+            or time.time() - self.last_flush_time >= self.flush_interval
+        ):
             self.flush()
 
     def flush(self) -> None:
@@ -74,4 +83,3 @@ class StreamProcessor:
         logger.debug("Closing processor, flushing remaining messages")
         self.flush()
         self.stream.close()
-

@@ -46,9 +46,12 @@ class StreamFactory:
 
         if normalized_type not in cls.REGISTRY:
             supported = list(cls.REGISTRY.keys())
-            logger.error(f"Unsupported stream type: {stream_type}. Supported types: {supported}")
-            raise UnsupportedTypeError(f"Unsupported stream type: {stream_type}. Supported types: {supported}")
+            logger.error(
+                f"Unsupported stream type: {stream_type}. Supported types: {supported}"
+            )
+            raise UnsupportedTypeError(
+                f"Unsupported stream type: {stream_type}. Supported types: {supported}"
+            )
 
         stream_class = cls.REGISTRY[normalized_type]
         return stream_class(**kwargs)
-

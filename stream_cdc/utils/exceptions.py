@@ -5,6 +5,7 @@ class ConfigurationError(Exception):
     This exception is raised when required configuration parameters are missing,
     have invalid values, or when there is a conflict in the configuration.
     """
+
     pass
 
 
@@ -16,6 +17,7 @@ class StreamError(Exception):
     fails due to connection issues, message size limitations, or other stream-related
     problems.
     """
+
     pass
 
 
@@ -27,6 +29,7 @@ class DataSourceError(Exception):
     querying, or reading data) fails due to connection issues, invalid credentials,
     or other data source-related problems.
     """
+
     pass
 
 
@@ -38,6 +41,7 @@ class ProcessingError(Exception):
     invalid data formats, transformation errors, or other processing-related
     issues.
     """
+
     pass
 
 
@@ -49,5 +53,5 @@ class UnsupportedTypeError(Exception):
     of a type that is not registered or supported, such as an unknown stream or
     data source type.
     """
-    pass
 
+    pass

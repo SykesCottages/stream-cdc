@@ -50,4 +50,3 @@ class DataSource(ABC):
             DataSourceError: If disconnection fails.
         """
         pass
-

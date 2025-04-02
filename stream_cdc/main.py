@@ -10,6 +10,7 @@ from typing import Any
 from stream_cdc.processing.worker import Worker
 from stream_cdc.config.loader import AppConfig
 
+
 def main() -> None:
     """
     Main entry point for the stream-cdc application.
@@ -33,13 +34,14 @@ def main() -> None:
         logger_instance = Logger(log_level=app_config.log_level)
         logger = logger_instance.get_logger()
 
-
     stream_type = os.getenv("STREAM_TYPE", "sqs").lower()
     datasource_type = os.getenv("DS_TYPE", "mysql").lower()
 
     stream = StreamFactory.create(stream_type)
     serializer = Serializer()
-    processor = StreamProcessor(stream, serializer, app_config.batch_size, app_config.flush_interval)
+    processor = StreamProcessor(
+        stream, serializer, app_config.batch_size, app_config.flush_interval
+    )
     datasource = DataSourceFactory.create(datasource_type)
     worker = Worker(datasource, processor)
 
@@ -65,4 +67,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

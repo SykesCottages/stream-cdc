@@ -45,7 +45,7 @@ def processor(mock_stream, mock_serializer):
         stream=mock_stream,
         serializer=mock_serializer,
         batch_size=3,
-        flush_interval=2.0
+        flush_interval=2.0,
     )
 
 
@@ -67,7 +67,11 @@ def test_process_single_event(processor, mock_stream):
 
     # Buffer should contain the serialized event
     assert len(processor.buffer) == 1
-    assert processor.buffer[0] == {"type": "test", "value": 123, "serialized": True}
+    assert processor.buffer[0] == {
+        "type": "test",
+        "value": 123,
+        "serialized": True,
+    }
 
     # Stream should not have received any messages yet (batch not full)
     assert len(mock_stream.sent_messages) == 0
@@ -122,7 +126,7 @@ def test_flush_with_messages(processor, mock_stream):
     # Add some messages to buffer
     processor.buffer = [
         {"id": 1, "serialized": True},
-        {"id": 2, "serialized": True}
+        {"id": 2, "serialized": True},
     ]
 
     # Record the last flush time
@@ -146,7 +150,7 @@ def test_close(processor, mock_stream):
     # Add some messages to buffer
     processor.buffer = [
         {"id": 1, "serialized": True},
-        {"id": 2, "serialized": True}
+        {"id": 2, "serialized": True},
     ]
 
     # Close the processor
@@ -160,5 +164,3 @@ def test_close(processor, mock_stream):
 
     # Stream should have been closed
     assert mock_stream.closed
-
-
