@@ -324,7 +324,7 @@ def test_create_event_schema(mysql_data_source):
     metadata = {
         "datasource_type": "mysql",
         "source": "localhost",
-        "timestamp": "1743598169"
+        "timestamp": "1743598169",
     }
 
     spec = {

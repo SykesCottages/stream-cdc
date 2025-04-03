@@ -19,9 +19,13 @@ class TestStateManagerFactory:
 
     def test_register_state_manager(self):
         """Test registering a state manager class"""
+
         class MockStateManager(StateManager):
-            def store(self): pass
-            def read(self): pass
+            def store(self):
+                pass
+
+            def read(self):
+                pass
 
         StateManagerFactory.register_state_manager("mock", MockStateManager)
 
@@ -30,9 +34,13 @@ class TestStateManagerFactory:
 
     def test_register_state_manager_case_insensitive(self):
         """Test that registration is case-insensitive"""
+
         class MockStateManager(StateManager):
-            def store(self): pass
-            def read(self): pass
+            def store(self):
+                pass
+
+            def read(self):
+                pass
 
         StateManagerFactory.register_state_manager("MoCK", MockStateManager)
 
@@ -41,11 +49,16 @@ class TestStateManagerFactory:
 
     def test_create_registered_state_manager(self):
         """Test creating a registered state manager"""
+
         class MockStateManager(StateManager):
             def __init__(self, **kwargs):
                 self.init_kwargs = kwargs
-            def store(self): pass
-            def read(self): pass
+
+            def store(self):
+                pass
+
+            def read(self):
+                pass
 
         StateManagerFactory.register_state_manager("mock", MockStateManager)
 
@@ -62,13 +75,16 @@ class TestStateManagerFactory:
 
     def test_create_case_insensitive(self):
         """Test that creation is case-insensitive"""
+
         class MockStateManager(StateManager):
-            def store(self): pass
-            def read(self): pass
+            def store(self):
+                pass
+
+            def read(self):
+                pass
 
         StateManagerFactory.register_state_manager("mock", MockStateManager)
 
         manager = StateManagerFactory.create("MoCK")
 
         assert isinstance(manager, MockStateManager)
-
