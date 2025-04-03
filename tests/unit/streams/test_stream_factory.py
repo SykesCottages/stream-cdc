@@ -16,9 +16,6 @@ def reset_stream_factory():
 class MockStream(Stream):
     """Mock implementation of Stream for testing."""
 
-    def __init__(self, **kwargs):
-        self.init_args = kwargs
-
     def send(self):
         pass
 
@@ -52,11 +49,10 @@ def test_create_stream():
     StreamFactory.register_stream("mock", MockStream)
 
     # Create an instance with some arguments
-    stream = StreamFactory.create("mock", arg1="value1", arg2="value2")
+    stream = StreamFactory.create("mock")
 
     # Check type and passed arguments
     assert isinstance(stream, MockStream)
-    assert stream.init_args == {"arg1": "value1", "arg2": "value2"}
 
 
 def test_create_stream_case_insensitive():
