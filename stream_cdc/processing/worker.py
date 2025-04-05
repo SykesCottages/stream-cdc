@@ -1,8 +1,9 @@
 from stream_cdc.utils.logger import logger
 import time
-from stream_cdc.datasources.factory import DataSource
+from stream_cdc.datasources.base import DataSource
 from stream_cdc.processing.processor import StreamProcessor
 from stream_cdc.utils.exceptions import ProcessingError
+from stream_cdc.state.base import StateManager
 
 
 class Worker:
@@ -15,7 +16,10 @@ class Worker:
     """
 
     def __init__(
-        self, data_source: DataSource, processor: StreamProcessor
+        self,
+        data_source: DataSource,
+        processor: StreamProcessor,
+        state_manager: StateManager,
     ) -> None:
         """
         Initialize the worker with a data source and processor.
@@ -23,9 +27,11 @@ class Worker:
         Args:
             data_source (DataSource): The data source to listen for changes from.
             processor (StreamProcessor): The processor to handle the changes.
+            state_manager (Optional[StateManager]): The state manager to load/save state.
         """
         self.data_source = data_source
         self.processor = processor
+        self.state_manager = state_manager
         self.running = True
 
     def run(self) -> None:
@@ -41,6 +47,23 @@ class Worker:
         """
         try:
             logger.info("Worker Started")
+
+            if self.state_manager:
+
+                if hasattr(self.data_source, "host"):
+                    datasource_type = "mysql"
+                    datasource_source = self.data_source.host
+
+                    # Load the saved position
+                    position = self.state_manager.read(
+                        datasource_type=datasource_type,
+                        datasource_source=datasource_source,
+                    )
+
+                    if position:
+                        logger.info(f"Resuming from saved position: {position}")
+                        self.data_source.set_position(position)
+
             self.data_source.connect()
             logger.info("Connected to data source")
             while self.running:

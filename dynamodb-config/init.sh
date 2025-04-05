@@ -7,6 +7,7 @@ echo "Creating DynamoDB table in Localstack..."
 
 aws dynamodb create-table \
     --endpoint-url $LOCALSTACK_ENDPOINT \
+    --region us-east-1 \
     --table-name $TABLE_NAME \
     --attribute-definitions \
         AttributeName=datasource_type,AttributeType=S \

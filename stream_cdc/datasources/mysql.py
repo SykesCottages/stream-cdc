@@ -186,11 +186,16 @@ class MySQLDataSource(DataSource):
         Initialize the MySQL data source with connection parameters.
 
         Args:
-            host (Optional[str]): The MySQL host. Defaults to DB_HOST environment variable.
-            user (Optional[str]): The MySQL user. Defaults to DB_USER environment variable.
-            password (Optional[str]): The MySQL password. Defaults to DB_PASSWORD environment variable.
-            port (Optional[int]): The MySQL port. Defaults to DB_PORT environment variable or 3306.
-            server_id (int): The server ID to use when connecting to the binlog. Defaults to 1234.
+            host (Optional[str]): The MySQL host. Defaults to DB_HOST
+                environment variable.
+            user (Optional[str]): The MySQL user. Defaults to DB_USER
+                environment variable.
+            password (Optional[str]): The MySQL password. Defaults to
+                DB_PASSWORD environment variable.
+            port (Optional[int]): The MySQL port. Defaults to DB_PORT
+                environment variable or 3306.
+            server_id (int): The server ID to use when connecting to the
+                binlog. Defaults to 1234.
 
         Raises:
             ConfigurationError: If any required parameter is missing.
@@ -238,7 +243,8 @@ class MySQLDataSource(DataSource):
 
         Args:
             metadata (dict): The event metadata, such as source and timestamp.
-            spec (dict): The event specification, such as database, table, and row data.
+            spec (dict): The event specification, such as database, table, and
+                row data.
 
         Returns:
             dict: The structured event schema.
@@ -293,14 +299,16 @@ class MySQLDataSource(DataSource):
         """
         Listen for changes in the MySQL binlog.
 
-        Yields events for each row change (insert, update, delete) in the binlog.
+        Yields events for each row change (insert, update, delete) in the
+            binlog.
         Tracks the current GTID for event correlation.
 
         Yields:
             Dict[str, Any]: A structured event representing a row change.
 
         Raises:
-            DataSourceError: If not connected or if an error occurs while listening.
+            DataSourceError: If not connected or if an error occurs while
+                listening.
         """
         if not self.client:
             raise DataSourceError("Data source not connected")
@@ -331,6 +339,7 @@ class MySQLDataSource(DataSource):
                         "datasource_type": "mysql",
                         "source": self.host,
                         "timestamp": event.timestamp,
+                        "position": self.current_gtid,
                     }
 
                     spec = {
@@ -367,3 +376,51 @@ class MySQLDataSource(DataSource):
             logger.error(f"Error while disconnecting from MySQL: {e}")
         finally:
             self.client = None
+
+    def get_position(self) -> Dict[str, str]:
+        """
+        Get the current GTID position.
+
+        Returns:
+            Dict[str, str]: A dictionary with the current GTID.
+        """
+        if self.current_gtid is None:
+            return {}
+
+        return {"gtid": self.current_gtid}
+
+    def set_position(self, position: Dict[str, str]) -> None:
+        """
+        Set the GTID position to resume from.
+
+        Args:
+            position (Dict[str, str]): The position with GTID info.
+        """
+        if position and "gtid" in position:
+            self.current_gtid = position["gtid"]
+            logger.info(f"Set starting GTID position to {self.current_gtid}")
+
+            # If we already have a client, update its settings
+            if self.client:
+                # Close the existing client
+                self.client.close()
+
+                # Create a new client with the GTID position
+                self.client = self.binlog_client(
+                    connection_settings={
+                        "host": self.host,
+                        "user": self.user,
+                        "passwd": self.password,
+                        "port": self.port,
+                    },
+                    server_id=self.server_id,
+                    blocking=True,
+                    resume_stream=True,
+                    auto_position=self.current_gtid,
+                    only_events=[
+                        WriteRowsEvent,
+                        UpdateRowsEvent,
+                        DeleteRowsEvent,
+                        GtidEvent,
+                    ],
+                )

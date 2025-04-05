@@ -7,37 +7,36 @@ from stream_cdc.state.base import StateManager
 from botocore.config import Config
 import botocore
 import packaging.version
+from stream_cdc.utils.exceptions import ConfigurationError
 
 
 class Dynamodb(StateManager):
-    def __init__(self, table_name: str, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize the DynamoDB state manager.
 
         Args:
-            table_name (str, optional): The DynamoDB table name. Defaults to env variable.
+            table_name (str, optional): The DynamoDB table name. Defaults to
+                env variable.
             **kwargs: Additional configuration options.
         """
         self.region = os.getenv("STATE_DYNAMODB_REGION")
         self.endpoint_url = os.getenv("STATE_DYNAMODB_ENDPOINT_URL")
         self.aws_access_key = os.getenv("STATE_DYNAMODB_ACCESS_KEY")
         self.aws_secret_key = os.getenv("STATE_DYNAMODB_SECRET_KEY")
-        self.table_name = table_name or os.getenv("STATE_DYNAMODB_TABLE")
+        self.table_name = os.getenv("STATE_DYNAMODB_TABLE")
         self.connect_timeout = float(
-            os.getenv("STATE_DYNAMODB_CONNECT_TIMEOUT", "0.5")
+            os.getenv("STATE_DYNAMODB_CONNECT_TIMEOUT", "5")
         )
-        self.read_timeout = float(
-            os.getenv("STATE_DYNAMODB_READ_TIMEOUT", "0.5")
+        self.read_timeout = float(os.getenv("STATE_DYNAMODB_READ_TIMEOUT", "5"))
+
+        logger.debug(
+            f"DynamoDB configuration: region={self.region}, "
+            f"endpoint={self.endpoint_url}, table={self.table_name}"
         )
 
-        # Override with kwargs if provided
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        # Initialize client
         self.client = self._create_client()
 
-        # Ensure table exists
         self._ensure_table_exists()
 
     def _create_client(self) -> Any:
@@ -76,39 +75,20 @@ class Dynamodb(StateManager):
 
     def _ensure_table_exists(self) -> None:
         """
-        Ensure the state table exists. If not, create it.
+        Check if the state table exists. Does not create it if it doesn't exist.
+
+        Raises:
+            ConfigurationError: If the table does not exist.
         """
         try:
             self.client.describe_table(TableName=self.table_name)
             logger.debug(f"DynamoDB table {self.table_name} exists.")
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                logger.info(f"Creating DynamoDB table {self.table_name}...")
-                self.client.create_table(
-                    TableName=self.table_name,
-                    KeySchema=[
-                        {"AttributeName": "datasource_type", "KeyType": "HASH"},
-                        {
-                            "AttributeName": "datasource_source",
-                            "KeyType": "RANGE",
-                        },
-                    ],
-                    AttributeDefinitions=[
-                        {
-                            "AttributeName": "datasource_type",
-                            "AttributeType": "S",
-                        },
-                        {
-                            "AttributeName": "datasource_source",
-                            "AttributeType": "S",
-                        },
-                    ],
-                    BillingMode="PAY_PER_REQUEST",
-                )
-                # Wait for table to be created
-                waiter = self.client.get_waiter("table_exists")
-                waiter.wait(TableName=self.table_name)
-                logger.info(f"Table {self.table_name} created successfully.")
+                error_msg = f"""DynamoDB table {self.table_name} does not exist.
+                            Please create it manually."""
+                logger.error(error_msg)
+                raise ConfigurationError(error_msg)
             else:
                 logger.error(f"Error checking table: {e}")
                 raise
@@ -120,28 +100,33 @@ class Dynamodb(StateManager):
         state_position: Dict[str, str],
     ) -> bool:
         """
-        Store state information in DynamoDB. Overwrites any existing state for the same key.
+        Store state information in DynamoDB. Overwrites any existing state for
+            the same key.
 
         Args:
-            datasource_type (str): The type of datasource (e.g., "postgres", "mysql")
-            datasource_source (str): The source identifier (e.g., "host1.example.com")
-            state_position (Dict[str, str]): State information, like {"gtid": "12345"}
+            datasource_type (str): The type of datasource (e.g., "postgres",
+                "mysql")
+            datasource_source (str): The source identifier (e.g.,
+                "host1.example.com")
+            state_position (Dict[str, str]): State information, like
+                {"gtid": "12345"}
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Convert state_position to DynamoDB format
             state_position_db = {}
-            for key, value in state_position.items():
-                state_position_db[key] = {"S": value}
+            state_position_db["last_position"] = {"S": state_position}
 
-            # Create item with required fields
+            print(datasource_type)
+
+            print(datasource_source)
             item = {
                 "datasource_type": {"S": datasource_type},
                 "datasource_source": {"S": datasource_source},
                 **state_position_db,
             }
+
 
             logger.debug(f"Storing state: {item}")
             self.client.put_item(TableName=self.table_name, Item=item)
@@ -160,11 +145,14 @@ class Dynamodb(StateManager):
         Read state information from DynamoDB.
 
         Args:
-            datasource_type (str): The type of datasource (e.g., "postgres", "mysql")
-            datasource_source (str): The source identifier (e.g., "host1.example.com")
+            datasource_type (str): The type of datasource (e.g., "postgres",
+                "mysql")
+            datasource_source (str): The source identifier (e.g.,
+                "host1.example.com")
 
         Returns:
-            Optional[Dict[str, str]]: The state information if found, None otherwise
+            Optional[Dict[str, str]]: The state information if found, None
+                otherwise
         """
         try:
             response = self.client.get_item(
@@ -182,12 +170,10 @@ class Dynamodb(StateManager):
                 return None
 
             # Convert DynamoDB format back to regular dictionary
-            # Exclude the key attributes
             result = {}
             for key, value in response["Item"].items():
                 if key not in ["datasource_type", "datasource_source"]:
-                    # Extract the value from the DynamoDB type descriptor
-                    for type_descriptor, actual_value in value.items():
+                    for actual_value in value.items():
                         result[key] = actual_value
                         break
 

@@ -3,6 +3,8 @@ import time
 from stream_cdc.utils.logger import logger
 from stream_cdc.streams.factory import Stream
 from stream_cdc.utils.serializer import Serializer
+from stream_cdc.datasources.base import DataSource
+from stream_cdc.state.base import StateManager
 
 
 class StreamProcessor:
@@ -20,6 +22,8 @@ class StreamProcessor:
         serializer: Serializer,
         batch_size: int,
         flush_interval: float,
+        data_source: DataSource,
+        state_manager: StateManager,
     ) -> None:
         """
         Initialize the processor with a stream, serializer, and batching parameters.
@@ -29,6 +33,8 @@ class StreamProcessor:
             serializer (Serializer): The serializer to use for event serialization.
             batch_size (int): The maximum number of events to buffer before flushing.
             flush_interval (float): The maximum time (in seconds) to wait before flushing.
+            data_source (Optional[DataSource]): The data source to get position from.
+            state_manager (Optional[StateManager]): The state manager to store position.
         """
         self.stream = stream
         self.serializer = serializer
@@ -36,6 +42,8 @@ class StreamProcessor:
         self.flush_interval = flush_interval
         self.buffer: List[Dict[str, Any]] = []
         self.last_flush_time = time.time()
+        self.data_source = data_source
+        self.state_manager = state_manager
 
     def process(self, event: Dict[str, Any]) -> None:
         """
@@ -47,6 +55,9 @@ class StreamProcessor:
         Args:
             event (Dict[str, Any]): The data change event to process.
         """
+        if "metadata" not in event:
+            raise Exception("Message missing metadata")
+
         serialized_event: Dict[str, Any] = self.serializer.serialize(event)
         self.buffer.append(serialized_event)
         logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
@@ -69,7 +80,30 @@ class StreamProcessor:
 
         messages = self.buffer
         logger.debug(f"Prepared {len(messages)} messages for sending")
+
         self.stream.send(messages)
+
+
+        if self.state_manager and messages:
+            last_message = messages[-1]
+
+            if "metadata" in last_message:
+                metadata = last_message["metadata"]
+                datasource_type = metadata.get("datasource_type", "unknown")
+                datasource_source = metadata.get("source", "unknown")
+
+                if "position" in metadata:
+                    position = metadata["position"]
+
+                    self.state_manager.store(
+                        datasource_type=datasource_type,
+                        datasource_source=datasource_source,
+                        state_position=position,
+                    )
+                    logger.debug(
+                        f"Updated state for {datasource_type}:{datasource_source} to {position}"
+                    )
+
         self.buffer.clear()
         self.last_flush_time = time.time()
 
