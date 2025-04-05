@@ -1,9 +1,7 @@
 from stream_cdc.utils.logger import logger
 import time
-from stream_cdc.datasources.base import DataSource
 from stream_cdc.processing.processor import StreamProcessor
 from stream_cdc.utils.exceptions import ProcessingError
-from stream_cdc.state.base import StateManager
 
 
 class Worker:
@@ -15,12 +13,7 @@ class Worker:
     eventual delivery to a stream.
     """
 
-    def __init__(
-        self,
-        data_source: DataSource,
-        processor: StreamProcessor,
-        state_manager: StateManager,
-    ) -> None:
+    def __init__(self, processor: StreamProcessor) -> None:
         """
         Initialize the worker with a data source and processor.
 
@@ -29,9 +22,7 @@ class Worker:
             processor (StreamProcessor): The processor to handle the changes.
             state_manager (Optional[StateManager]): The state manager to load/save state.
         """
-        self.data_source = data_source
         self.processor = processor
-        self.state_manager = state_manager
         self.running = True
 
     def run(self) -> None:
@@ -47,36 +38,16 @@ class Worker:
         """
         try:
             logger.info("Worker Started")
+            self.processor.start()
 
-            if self.state_manager:
-
-                if hasattr(self.data_source, "host"):
-                    datasource_type = "mysql"
-                    datasource_source = self.data_source.host
-
-                    # Load the saved position
-                    position = self.state_manager.read(
-                        datasource_type=datasource_type,
-                        datasource_source=datasource_source,
-                    )
-
-                    if position:
-                        logger.info(f"Resuming from saved position: {position}")
-                        self.data_source.set_position(position)
-
-            self.data_source.connect()
-            logger.info("Connected to data source")
             while self.running:
-                for change in self.data_source.listen():
-                    if not self.running:
-                        break
-                    self.processor.process(change)
+                self.processor.process_next()
+
         except Exception as e:
             logger.error(f"Worker error: {e}")
             raise ProcessingError(f"Processing failed: {str(e)}")
         finally:
-            self.processor.close()
-            self.data_source.disconnect()
+            self.processor.stop()
             logger.info("Worker stopped gracefully")
 
     def stop(self) -> None:

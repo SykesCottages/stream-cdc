@@ -6,7 +6,6 @@ from stream_cdc.streams.factory import StreamFactory
 from stream_cdc.processing.processor import StreamProcessor
 from stream_cdc.datasources.factory import DataSourceFactory
 from stream_cdc.state.factory import StateManagerFactory
-from stream_cdc.utils.serializer import Serializer
 from typing import Any
 from stream_cdc.processing.worker import Worker
 from stream_cdc.config.loader import AppConfig
@@ -41,7 +40,6 @@ def main() -> None:
 
     # Create components
     stream = StreamFactory.create(stream_type)
-    serializer = Serializer()
     datasource = DataSourceFactory.create(datasource_type)
 
     state_manager = StateManagerFactory.create(state_manager_type)
@@ -49,15 +47,14 @@ def main() -> None:
     # Create processor with state manager
     processor = StreamProcessor(
         stream=stream,
-        serializer=serializer,
         batch_size=app_config.batch_size,
-        flush_interval=app_config.flush_interval,
+        flush_interval=2.0,
         data_source=datasource,
         state_manager=state_manager,
     )
 
     # Create worker with state manager
-    worker = Worker(datasource, processor, state_manager)
+    worker = Worker(processor)
 
     # Signal handling and run
     def signal_handler(sig: Any, _frame: Any) -> None:

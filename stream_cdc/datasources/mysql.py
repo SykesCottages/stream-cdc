@@ -1,8 +1,9 @@
-from typing import Generator, Any, Dict, Optional, Union
+from typing import Generator, Any, Dict, Optional, Union, List
 import os
+import time
 import pymysql
 from pymysqlreplication import BinLogStreamReader
-from pymysqlreplication.event import GtidEvent
+from pymysqlreplication.event import GtidEvent, QueryEvent
 from pymysqlreplication.row_event import (
     DeleteRowsEvent,
     UpdateRowsEvent,
@@ -15,13 +16,6 @@ from stream_cdc.utils.exceptions import DataSourceError, ConfigurationError
 
 
 class MySQLSettingsValidator:
-    """
-    Private validator for MySQL CDC settings.
-
-    This class validates that the MySQL server has the required settings for
-    Change Data Capture (CDC), such as binlog format, GTID mode, etc.
-    """
-
     def __init__(
         self,
         host: Union[str, None],
@@ -29,18 +23,6 @@ class MySQLSettingsValidator:
         password: Union[str, None],
         port: Union[int, None],
     ):
-        """
-        Initialize the validator with MySQL connection parameters.
-
-        Args:
-            host (Union[str, None]): The MySQL host.
-            user (Union[str, None]): The MySQL user.
-            password (Union[str, None]): The MySQL password.
-            port (Union[int, None]): The MySQL port.
-
-        Raises:
-            ConfigurationError: If any required parameter is missing.
-        """
         if not host:
             raise ConfigurationError("Database host is required for validation")
         if not user:
@@ -58,12 +40,6 @@ class MySQLSettingsValidator:
         self.port = port
 
     def _get_required_settings(self) -> Dict[str, str]:
-        """
-        Return the dictionary of required settings and their expected values.
-
-        Returns:
-            Dict[str, str]: A dictionary mapping setting names to their expected values.
-        """
         return {
             "binlog_format": "ROW",
             "binlog_row_metadata": "FULL",
@@ -73,15 +49,6 @@ class MySQLSettingsValidator:
         }
 
     def _fetch_actual_settings(self, cursor) -> Dict[str, str]:
-        """
-        Fetch the actual settings from the database.
-
-        Args:
-            cursor: The database cursor to execute queries with.
-
-        Returns:
-            Dict[str, str]: A dictionary mapping setting names to their actual values.
-        """
         required_settings = self._get_required_settings()
 
         var_query = "SHOW GLOBAL VARIABLES WHERE Variable_name IN (%s)"
@@ -96,15 +63,6 @@ class MySQLSettingsValidator:
         return actual_settings
 
     def _verify_settings(self, actual_settings: Dict[str, str]) -> None:
-        """
-        Verify that all required settings have the correct values.
-
-        Args:
-            actual_settings (Dict[str, str]): The actual settings from the database.
-
-        Raises:
-            ConfigurationError: If any setting is missing or has an incorrect value.
-        """
         required_settings = self._get_required_settings()
 
         for setting, expected in required_settings.items():
@@ -120,23 +78,14 @@ class MySQLSettingsValidator:
                 logger.error(
                     f"MySQL setting {setting} is set to {actual}, expected {expected}"
                 )
-                raise ConfigurationError(f"""
-                    MySQL setting {setting} is incorrect: expected={expected},
-                    actual={actual}
-                    """)
+                raise ConfigurationError(
+                    f"MySQL setting {setting} is incorrect: "
+                    f"expected={expected}, actual={actual}"
+                )
 
             logger.info(f"MySQL setting {setting} is correctly set to {actual}")
 
     def validate(self) -> None:
-        """
-        Validate that MySQL has all the required settings for CDC.
-
-        Connects to the MySQL server, fetches the actual settings, and verifies
-        that they match the required settings.
-
-        Raises:
-            ConfigurationError: If validation fails.
-        """
         try:
             conn = pymysql.connect(
                 host=self.host,
@@ -164,14 +113,6 @@ class MySQLSettingsValidator:
 
 
 class MySQLDataSource(DataSource):
-    """
-    MySQL binlog implementation of the DataSource interface.
-
-    This class connects to a MySQL server and listens for changes to the binlog,
-    which records all data modifications. It produces a stream of events representing
-    inserts, updates, and deletes.
-    """
-
     SCHEMA_VERSION = "mysql-31-03-2025"
 
     def __init__(
@@ -182,24 +123,6 @@ class MySQLDataSource(DataSource):
         port: Optional[int] = None,
         server_id: int = 1234,
     ):
-        """
-        Initialize the MySQL data source with connection parameters.
-
-        Args:
-            host (Optional[str]): The MySQL host. Defaults to DB_HOST
-                environment variable.
-            user (Optional[str]): The MySQL user. Defaults to DB_USER
-                environment variable.
-            password (Optional[str]): The MySQL password. Defaults to
-                DB_PASSWORD environment variable.
-            port (Optional[int]): The MySQL port. Defaults to DB_PORT
-                environment variable or 3306.
-            server_id (int): The server ID to use when connecting to the
-                binlog. Defaults to 1234.
-
-        Raises:
-            ConfigurationError: If any required parameter is missing.
-        """
         self.host = host or os.getenv("DB_HOST")
         if not self.host:
             raise ConfigurationError("DB_HOST is required")
@@ -217,14 +140,16 @@ class MySQLDataSource(DataSource):
         self.binlog_client = BinLogStreamReader
         self.client = None
         self.current_gtid = None
+        self.last_seen_event_gtid = None
+
+        # For tracking transaction state
+        self.transaction_complete = False
+
+        # For monitoring stream health
+        self.last_event_time = 0
+        self.event_timeout = 30  # Seconds before reconnecting due to inactivity
 
     def _validate_settings(self) -> None:
-        """
-        Validate MySQL settings required for CDC.
-
-        Raises:
-            ConfigurationError: If validation fails.
-        """
         try:
             validator = MySQLSettingsValidator(
                 host=self.host,
@@ -238,122 +163,205 @@ class MySQLDataSource(DataSource):
             raise
 
     def _create_event_schema(self, metadata: dict, spec: dict):
-        """
-        Create a standardized event schema from metadata and specification.
-
-        Args:
-            metadata (dict): The event metadata, such as source and timestamp.
-            spec (dict): The event specification, such as database, table, and
-                row data.
-
-        Returns:
-            dict: The structured event schema.
-        """
         return {
             "version": self.SCHEMA_VERSION,
             "metadata": metadata,
             "spec": spec,
         }
 
-    def _keep_track(self):
-        pass
+    def _create_binlog_client(
+        self, auto_position: Optional[str] = None
+    ) -> BinLogStreamReader:
+        connection_settings = {
+            "host": self.host,
+            "user": self.user,
+            "passwd": self.password,
+            "port": self.port,
+        }
+
+        client_args = {
+            "connection_settings": connection_settings,
+            "server_id": self.server_id,
+            "blocking": True,
+            "resume_stream": True,
+            "only_events": [
+                WriteRowsEvent,
+                UpdateRowsEvent,
+                DeleteRowsEvent,
+                GtidEvent,
+                QueryEvent,
+            ],
+        }
+
+        if auto_position:
+            logger.debug(f"Setting auto_position to: {auto_position}")
+            client_args["auto_position"] = auto_position
+
+        return self.binlog_client(**client_args)
 
     def connect(self) -> None:
-        """
-        Connect to the MySQL binlog stream.
-
-        Validates the MySQL settings and initializes the binlog client.
-
-        Raises:
-            DataSourceError: If connection fails.
-        """
         logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
 
         self._validate_settings()
 
         try:
-            self.client = self.binlog_client(
-                connection_settings={
-                    "host": self.host,
-                    "user": self.user,
-                    "passwd": self.password,
-                    "port": self.port,
-                },
-                server_id=self.server_id,
-                blocking=True,
-                resume_stream=True,
-                only_events=[
-                    WriteRowsEvent,
-                    UpdateRowsEvent,
-                    DeleteRowsEvent,
-                    GtidEvent,
-                ],
-            )
+            # No stored position - connect normally
+            if not self.current_gtid:
+                logger.info("No stored position, connecting from current position")
+                self.client = self._create_binlog_client()
+                logger.info("Connected to MySQL binlog stream")
+                return
+
+            # Try to resume from stored position
+            logger.info(f"Attempting to resume from GTID: {self.current_gtid}")
+            try:
+                # Create a proper GTID set for MySQL
+                gtid_set = self.current_gtid.split(':')[0] + ':1-' + self.current_gtid.split(':')[1]
+                logger.info(f"Using GTID set for auto_position: {gtid_set}")
+
+                self.client = self._create_binlog_client(auto_position=gtid_set)
+                logger.info(f"Successfully connected using GTID set: {gtid_set}")
+                return
+            except Exception as e:
+                logger.error(f"Failed to resume from GTID {self.current_gtid}: {e}")
+                import traceback
+                logger.error(f"Exception details: {traceback.format_exc()}")
+
+            # Fall back to connecting without position
+            logger.info("Connecting without position specification")
+            self.client = self._create_binlog_client()
             logger.info("Connected to MySQL binlog stream")
         except Exception as e:
             error_msg = f"Failed to connect to MySQL: {str(e)}"
             logger.error(error_msg)
             raise DataSourceError(error_msg)
 
+    def _get_event_type(self, event) -> str:
+        if isinstance(event, WriteRowsEvent):
+            return "Insert"
+        if isinstance(event, UpdateRowsEvent):
+            return "Update"
+        if isinstance(event, DeleteRowsEvent):
+            return "Delete"
+        return type(event).__name__
+
+    def _handle_query_event(self, event) -> None:
+        try:
+            # Check if query is bytes and decode if needed
+            query = event.query
+            if isinstance(query, bytes):
+                query = query.decode('utf-8')
+            elif not isinstance(query, str):
+                logger.warning(f"Query is not a string or bytes: {type(query)}")
+                return
+
+            if query == "COMMIT":
+                self.transaction_complete = True
+                logger.debug(f"Transaction {self.last_seen_event_gtid} COMMITTED")
+        except Exception as e:
+            logger.warning(f"Failed to process query: {e}")
+
+    def _handle_gtid_event(self, event) -> None:
+        old_gtid = self.current_gtid
+        self.current_gtid = event.gtid
+        self.last_seen_event_gtid = event.gtid
+        self.transaction_complete = False
+
+        # First GTID event
+        if not old_gtid:
+            logger.debug(f"Initial GTID set: {self.current_gtid}")
+            return
+
+        # Parse and compare transaction numbers if available
+        try:
+            old_txn = int(old_gtid.split(':')[1])
+            new_txn = int(event.gtid.split(':')[1])
+
+            if new_txn < old_txn:
+                logger.warning(f"GTID went backward: {old_gtid} -> {event.gtid}")
+            elif new_txn > old_txn + 1:
+                logger.warning(
+                    f"GTID skipped: {old_gtid} -> {event.gtid}, "
+                    f"missing {new_txn - old_txn - 1} transactions"
+                )
+            else:
+                logger.debug(f"Updated current GTID: {self.current_gtid}")
+        except (IndexError, ValueError):
+            logger.debug(f"Updated current GTID to: {self.current_gtid}")
+
+    def _process_row_event(self, event) -> Generator[Dict[str, Any], None, None]:
+        if not self.last_seen_event_gtid:
+            logger.warning("Received row event before any GTID event")
+            return
+
+        event_type = self._get_event_type(event)
+        transaction_status = "COMPLETE" if self.transaction_complete else "IN_PROGRESS"
+
+        for row in event.rows:
+            metadata = {
+                "datasource_type": "mysql",
+                "source": self.host,
+                "timestamp": event.timestamp,
+                "position": self.last_seen_event_gtid,
+                "transaction_status": transaction_status,
+            }
+
+            spec = {
+                "database": event.schema,
+                "table": event.table,
+                "event_type": event_type,
+                "row": row,
+                "gtid": self.last_seen_event_gtid,
+            }
+
+            output = self._create_event_schema(metadata, spec)
+            yield output
+
+    def _check_reconnect_needed(self) -> bool:
+        if not self.last_event_time:
+            return False
+
+        current_time = time.time()
+        if current_time - self.last_event_time > self.event_timeout:
+            logger.warning(
+                f"No events received for {self.event_timeout} seconds, reconnecting"
+            )
+            return True
+
+        return False
+
     def listen(self) -> Generator[Dict[str, Any], None, None]:
-        """
-        Listen for changes in the MySQL binlog.
-
-        Yields events for each row change (insert, update, delete) in the
-            binlog.
-        Tracks the current GTID for event correlation.
-
-        Yields:
-            Dict[str, Any]: A structured event representing a row change.
-
-        Raises:
-            DataSourceError: If not connected or if an error occurs while
-                listening.
-        """
         if not self.client:
             raise DataSourceError("Data source not connected")
 
-        def get_event_type(event) -> str:
-            match event:
-                case WriteRowsEvent():
-                    return "Insert"
-
-                case UpdateRowsEvent():
-                    return "Update"
-
-                case DeleteRowsEvent():
-                    return "Delete"
-
-                case _:
-                    return type(event).__name__
+        # Check if reconnection is needed due to timeout
+        if self._check_reconnect_needed():
+            self.disconnect()
+            self.connect()
 
         try:
+            if self.current_gtid:
+                logger.debug(f"Listening from position: {self.current_gtid}")
+
+            # Update last event time
+            self.last_event_time = time.time()
+
             for event in self.client:
+                self.last_event_time = time.time()
+
+                # Handle GTID events - update our position tracking
                 if isinstance(event, GtidEvent):
-                    self.current_gtid = event.gtid
-                    logger.debug(f"Updated current GTID: {self.current_gtid}")
+                    self._handle_gtid_event(event)
                     continue
 
-                for row in event.rows:
-                    metadata = {
-                        "datasource_type": "mysql",
-                        "source": self.host,
-                        "timestamp": event.timestamp,
-                        "position": self.current_gtid,
-                    }
+                # Handle QUERY events - track transaction boundaries
+                if isinstance(event, QueryEvent):
+                    self._handle_query_event(event)
+                    continue
 
-                    spec = {
-                        "database": event.schema,
-                        "table": event.table,
-                        "event_type": get_event_type(event),
-                        "row": row,
-                        "gtid": self.current_gtid,
-                    }
-
-                    output = self._create_event_schema(metadata, spec)
-                    logger.debug(f"Event: {output}")
-
-                    yield output
+                # Handle ROW events - yield data to consumers
+                for row_event in self._process_row_event(event):
+                    yield row_event
 
         except Exception as e:
             error_msg = f"Error while listening to MySQL binlog: {str(e)}"
@@ -361,11 +369,6 @@ class MySQLDataSource(DataSource):
             raise DataSourceError(error_msg)
 
     def disconnect(self) -> None:
-        """
-        Disconnect from the MySQL binlog stream.
-
-        Closes the binlog client if it exists.
-        """
         if not self.client:
             return
 
@@ -378,49 +381,23 @@ class MySQLDataSource(DataSource):
             self.client = None
 
     def get_position(self) -> Dict[str, str]:
-        """
-        Get the current GTID position.
-
-        Returns:
-            Dict[str, str]: A dictionary with the current GTID.
-        """
         if self.current_gtid is None:
             return {}
 
         return {"gtid": self.current_gtid}
 
     def set_position(self, position: Dict[str, str]) -> None:
-        """
-        Set the GTID position to resume from.
+        if not position:
+            logger.warning("No position data provided")
+            return
 
-        Args:
-            position (Dict[str, str]): The position with GTID info.
-        """
-        if position and "gtid" in position:
+        # Check for gtid key first, then try last_position
+        if "gtid" in position:
             self.current_gtid = position["gtid"]
             logger.info(f"Set starting GTID position to {self.current_gtid}")
-
-            # If we already have a client, update its settings
-            if self.client:
-                # Close the existing client
-                self.client.close()
-
-                # Create a new client with the GTID position
-                self.client = self.binlog_client(
-                    connection_settings={
-                        "host": self.host,
-                        "user": self.user,
-                        "passwd": self.password,
-                        "port": self.port,
-                    },
-                    server_id=self.server_id,
-                    blocking=True,
-                    resume_stream=True,
-                    auto_position=self.current_gtid,
-                    only_events=[
-                        WriteRowsEvent,
-                        UpdateRowsEvent,
-                        DeleteRowsEvent,
-                        GtidEvent,
-                    ],
-                )
+        elif "last_position" in position:
+            self.current_gtid = position["last_position"]
+            logger.info(f"Set starting GTID position to {self.current_gtid} (from last_position)")
+        else:
+            logger.warning("No valid GTID position found in the provided position data")
+            return

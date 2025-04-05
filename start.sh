@@ -18,6 +18,7 @@ done
 
 echo "Creating SQS queue: $QUEUE_NAME..."
 aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" sqs create-queue --queue-name "$QUEUE_NAME" > /dev/null
+# aws --endpoint-url="http://localhost:4566" --region="us-east-1" sqs create-queue --queue-name "my-queue"
 
 # Check if the DynamoDB table exists
 echo "Checking if DynamoDB table $TABLE_NAME exists..."
