@@ -66,6 +66,10 @@ class SQS(Stream):
 
         self._client = self._create_client()
 
+        logger.debug(
+            f"Setup queue: {self.queue_url} - {self.endpoint_url} - {self.region}"
+        )
+
     def _create_client(self) -> Any:
         """
         Create and configure the boto3 SQS client.

@@ -1,166 +1,199 @@
 import pytest
 import time
+from unittest.mock import MagicMock
 from stream_cdc.processing.processor import StreamProcessor
-from stream_cdc.streams.base import Stream
 
 
-class MockStream(Stream):
-    """Mock implementation of Stream for testing."""
+class TestStreamProcessor:
+    """Test cases for StreamProcessor implementation"""
 
-    def __init__(self):
-        self.sent_messages = []
-        self.closed = False
+    @pytest.fixture
+    def mock_stream(self):
+        """Fixture to provide a mock stream."""
+        stream = MagicMock()
+        return stream
 
-    def send(self, messages):
-        self.sent_messages.extend(messages)
+    @pytest.fixture
+    def mock_datasource(self):
+        """Fixture to provide a mock data source."""
+        datasource = MagicMock()
+        return datasource
 
-    def close(self):
-        self.closed = True
+    @pytest.fixture
+    def mock_state_manager(self):
+        """Fixture to provide a mock state manager."""
+        state_manager = MagicMock()
+        return state_manager
 
+    @pytest.fixture
+    def processor(self, mock_stream, mock_datasource, mock_state_manager):
+        """Fixture to provide a StreamProcessor instance."""
+        return StreamProcessor(
+            stream=mock_stream,
+            datasource=mock_datasource,
+            state_manager=mock_state_manager,
+            batch_size=3,
+            flush_interval=2.0,
+        )
 
-class MockSerializer:
-    """Mock implementation of Serializer for testing."""
+    def test_processor_init(self, processor, mock_stream, mock_datasource, mock_state_manager):
+        """Test processor initialization."""
+        assert processor.stream == mock_stream
+        assert processor.datasource == mock_datasource
+        assert processor.state_manager == mock_state_manager
+        assert processor.batch_size == 3
+        assert processor.flush_interval == 2.0
+        assert processor.buffer == []
+        assert processor.last_flush_time <= time.time()
+        assert processor._current_iterator is None
 
-    def serialize(self, data):
-        data["serialized"] = True
-        return data
+    def test_process_single_event(self, processor):
+        """Test processing a single event."""
+        # Process an event with metadata
+        event = {"metadata": {"position": "gtid:123", "datasource_type": "mysql", "source": "localhost"}}
 
+        # Process event
+        processor.process(event)
 
-@pytest.fixture
-def mock_stream():
-    """Fixture to provide a mock stream."""
-    return MockStream()
+        # Buffer should contain the serialized event
+        assert len(processor.buffer) == 1
+        assert processor.buffer[0]["metadata"] == event["metadata"]
 
+        # Stream should not have received any messages yet (batch not full)
+        processor.stream.send.assert_not_called()
 
-@pytest.fixture
-def mock_serializer():
-    """Fixture to provide a mock serializer."""
-    return MockSerializer()
+    def test_process_batch_size_flush(self, processor, mock_stream):
+        """Test flushing when batch size is reached."""
+        # Create a side effect to capture the messages sent to the stream
+        sent_messages = []
+        def capture_messages(messages):
+            sent_messages.extend(messages)
+            return None
 
+        # Set up the mock to capture the messages
+        mock_stream.send.side_effect = capture_messages
 
-@pytest.fixture
-def processor(mock_stream, mock_serializer):
-    """Fixture to provide a StreamProcessor instance."""
-    return StreamProcessor(
-        stream=mock_stream,
-        serializer=mock_serializer,
-        batch_size=3,
-        flush_interval=2.0,
-    )
+        # Process events up to batch size
+        for i in range(3):
+            processor.process({
+                "metadata": {
+                    "position": f"gtid:{i}",
+                    "datasource_type": "mysql",
+                    "source": "localhost"
+                }
+            })
 
+        # Buffer should be empty after flush
+        assert len(processor.buffer) == 0
 
-def test_processor_init(processor, mock_stream, mock_serializer):
-    """Test processor initialization."""
-    assert processor.stream == mock_stream
-    assert processor.serializer == mock_serializer
-    assert processor.batch_size == 3
-    assert processor.flush_interval == 2.0
-    assert processor.buffer == []
-    assert processor.last_flush_time <= time.time()
+        # Stream should have received all messages
+        mock_stream.send.assert_called_once()
 
+        # Verify we captured 3 messages
+        assert len(sent_messages) == 3
 
-def test_process_single_event(processor, mock_stream):
-    """Test processing a single event."""
-    # Process an event
-    event = {"type": "test", "value": 123}
-    processor.process(event)
+        # Verify the content of the messages
+        for i, msg in enumerate(sent_messages):
+            assert msg["metadata"]["position"] == f"gtid:{i}"
+            assert msg["metadata"]["datasource_type"] == "mysql"
+            assert msg["metadata"]["source"] == "localhost"
 
-    # Buffer should contain the serialized event
-    assert len(processor.buffer) == 1
-    assert processor.buffer[0] == {
-        "type": "test",
-        "value": 123,
-        "serialized": True,
-    }
+    def test_process_flush_interval(self, processor):
+        """Test flushing when flush interval is reached."""
+        # Set last flush time to past
+        processor.last_flush_time = time.time() - 3.0  # 3 seconds ago
 
-    # Stream should not have received any messages yet (batch not full)
-    assert len(mock_stream.sent_messages) == 0
+        # Process a single event
+        processor.process({
+            "metadata": {
+                "position": "gtid:123",
+                "datasource_type": "mysql",
+                "source": "localhost"
+            }
+        })
 
+        # Buffer should be empty after time-based flush
+        assert len(processor.buffer) == 0
 
-def test_process_batch_size_flush(processor, mock_stream):
-    """Test flushing when batch size is reached."""
-    # Process events up to batch size
-    for i in range(3):
-        processor.process({"id": i})
+        # Stream should have received the message
+        processor.stream.send.assert_called_once()
 
-    # Buffer should be empty after flush
-    assert len(processor.buffer) == 0
+    def test_flush_empty_buffer(self, processor, mock_stream):
+        """Test flushing with empty buffer."""
+        # Buffer starts empty
+        assert len(processor.buffer) == 0
 
-    # Stream should have received all messages
-    assert len(mock_stream.sent_messages) == 3
-    assert mock_stream.sent_messages[0] == {"id": 0, "serialized": True}
-    assert mock_stream.sent_messages[1] == {"id": 1, "serialized": True}
-    assert mock_stream.sent_messages[2] == {"id": 2, "serialized": True}
+        # Flush should not send anything
+        processor.flush()
 
+        # Stream should not have received any messages
+        processor.stream.send.assert_not_called()
 
-def test_process_flush_interval(processor, mock_stream):
-    """Test flushing when flush interval is reached."""
-    # Set last flush time to past
-    processor.last_flush_time = time.time() - 3.0  # 3 seconds ago
+    def test_flush_with_messages(self, processor, mock_state_manager):
+        """Test flushing with messages in buffer."""
+        # Add some messages to buffer
+        processor.buffer = [
+            {
+                "metadata": {
+                    "position": "gtid:1",
+                    "datasource_type": "mysql",
+                    "source": "localhost"
+                }
+            },
+            {
+                "metadata": {
+                    "position": "gtid:2",
+                    "datasource_type": "mysql",
+                    "source": "localhost"
+                }
+            },
+        ]
 
-    # Process a single event
-    processor.process({"id": 123})
+        # Record the last flush time
+        old_last_flush_time = processor.last_flush_time
 
-    # Buffer should be empty after time-based flush
-    assert len(processor.buffer) == 0
+        # Flush the buffer
+        processor.flush()
 
-    # Stream should have received the message
-    assert len(mock_stream.sent_messages) == 1
-    assert mock_stream.sent_messages[0] == {"id": 123, "serialized": True}
+        # Buffer should be empty
+        assert len(processor.buffer) == 0
 
+        # Stream should have received the messages
+        processor.stream.send.assert_called_once()
 
-def test_flush_empty_buffer(processor, mock_stream):
-    """Test flushing with empty buffer."""
-    # Buffer starts empty
-    assert len(processor.buffer) == 0
+        # Last flush time should be updated
+        assert processor.last_flush_time > old_last_flush_time
 
-    # Flush should not send anything
-    processor.flush()
+        # State should be saved with the last position
+        mock_state_manager.store.assert_called_once()
+        store_args = mock_state_manager.store.call_args[1]
+        assert store_args["datasource_type"] == "mysql"
+        assert store_args["datasource_source"] == "localhost"
+        assert store_args["state_position"] == {"gtid": "gtid:2"}
 
-    # Stream should not have received any messages
-    assert len(mock_stream.sent_messages) == 0
+    def test_close(self, processor):
+        """Test closing the processor."""
+        # Add some messages to buffer
+        processor.buffer = [
+            {
+                "metadata": {
+                    "position": "gtid:1",
+                    "datasource_type": "mysql",
+                    "source": "localhost"
+                }
+            },
+        ]
 
+        # Close the processor
+        processor.stop()
 
-def test_flush_with_messages(processor, mock_stream):
-    """Test flushing with messages in buffer."""
-    # Add some messages to buffer
-    processor.buffer = [
-        {"id": 1, "serialized": True},
-        {"id": 2, "serialized": True},
-    ]
+        # Buffer should be empty (flushed)
+        assert len(processor.buffer) == 0
 
-    # Record the last flush time
-    old_last_flush_time = processor.last_flush_time
+        # Stream should have received the messages and been closed
+        processor.stream.send.assert_called_once()
+        processor.stream.close.assert_called_once()
 
-    # Flush the buffer
-    processor.flush()
+        # Data source should be disconnected
+        processor.datasource.disconnect.assert_called_once()
 
-    # Buffer should be empty
-    assert len(processor.buffer) == 0
-
-    # Stream should have received the messages
-    assert len(mock_stream.sent_messages) == 2
-
-    # Last flush time should be updated
-    assert processor.last_flush_time > old_last_flush_time
-
-
-def test_close(processor, mock_stream):
-    """Test closing the processor."""
-    # Add some messages to buffer
-    processor.buffer = [
-        {"id": 1, "serialized": True},
-        {"id": 2, "serialized": True},
-    ]
-
-    # Close the processor
-    processor.close()
-
-    # Buffer should be empty (flushed)
-    assert len(processor.buffer) == 0
-
-    # Stream should have received the messages
-    assert len(mock_stream.sent_messages) == 2
-
-    # Stream should have been closed
-    assert mock_stream.closed

@@ -11,16 +11,11 @@ class StateManagerFactory:
 
     REGISTRY: ClassVar[Dict[str, Type[StateManager]]] = {}
 
-
     @classmethod
     def register_state_manager(
-            cls,
-            name: str,
-            state_manager_class: Type[StateManager]
-        ) -> None:
-
+        cls, name: str, state_manager_class: Type[StateManager]
+    ) -> None:
         cls.REGISTRY[name.lower()] = state_manager_class
-
 
     @classmethod
     def create(cls, state_manager_type: str, **kwargs) -> StateManager:
@@ -41,10 +36,12 @@ class StateManagerFactory:
         if normalized_type not in cls.REGISTRY:
             supported = list(cls.REGISTRY.keys())
             logger.error(
-            f"Unsupported state manager type: {state_manager_type}. "
-            f"Supported types: {supported}")
-            raise UnsupportedTypeError(f"Unsupported state manager type: "
-                                       f"{state_manager_type}.")
+                f"Unsupported state manager type: {state_manager_type}. "
+                f"Supported types: {supported}"
+            )
+            raise UnsupportedTypeError(
+                f"Unsupported state manager type: {state_manager_type}."
+            )
 
         state_manager_class = cls.REGISTRY[normalized_type]
         return state_manager_class(**kwargs)

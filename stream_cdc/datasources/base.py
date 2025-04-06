@@ -50,3 +50,29 @@ class DataSource(ABC):
             DataSourceError: If disconnection fails.
         """
         pass
+
+    @abstractmethod
+    def get_position(self) -> Dict[str, str]:
+        """
+        Get the current position of the data source.
+
+        This method should return a dictionary representing the current position
+        in a format that can be used to resume streaming from this point.
+
+        Returns:
+            Dict[str, str]: A dictionary with position information.
+        """
+        pass
+
+    @abstractmethod
+    def set_position(self, position: Dict[str, str]) -> None:
+        """
+        Set the starting position for streaming.
+
+        This method should configure the data source to start streaming
+        from the specified position.
+
+        Args:
+            position (Dict[str, str]): The position information.
+        """
+        pass
