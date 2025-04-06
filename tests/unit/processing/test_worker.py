@@ -26,6 +26,7 @@ class TestWorker:
 
     def test_run_stop_flow(self, worker, mock_processor):
         """Test run method with normal stop flow."""
+
         # Configure the worker to stop after processing
         def set_stop():
             worker.running = False
@@ -99,4 +100,3 @@ class TestWorker:
 
                 # Verify worker exits with code 0
                 mock_exit.assert_called_once_with(0)
-

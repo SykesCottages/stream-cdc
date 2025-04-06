@@ -102,4 +102,3 @@ class TestDataSourceFactory:
         assert "Supported types:" in error_message
         assert "mysql" in error_message
         assert "postgres" in error_message
-
