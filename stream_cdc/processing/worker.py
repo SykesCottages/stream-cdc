@@ -8,9 +8,9 @@ class Worker:
     """
     Main worker class that orchestrates the data flow pipeline.
 
-    This class connects a data source to a processor, continuously pulling changes
-    from the data source and passing them to the processor for processing and
-    eventual delivery to a stream.
+    This class connects a data source to a processor, continuously pulling
+    changes from the data source and passing them to the processor for
+    processing and eventual delivery to a stream.
     """
 
     def __init__(self, processor: StreamProcessor) -> None:
@@ -18,9 +18,11 @@ class Worker:
         Initialize the worker with a data source and processor.
 
         Args:
-            data_source (DataSource): The data source to listen for changes from.
+            data_source (DataSource): The data source to listen for changes
+            from.
             processor (StreamProcessor): The processor to handle the changes.
-            state_manager (Optional[StateManager]): The state manager to load/save state.
+            state_manager (Optional[StateManager]): The state manager to
+            load/save state.
         """
         self.processor = processor
         self.running = True

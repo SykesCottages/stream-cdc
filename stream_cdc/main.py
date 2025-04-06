@@ -15,13 +15,13 @@ def main() -> None:
     """
     Main entry point for the stream-cdc application.
 
-    This function initializes the application, including loading the configuration,
-    setting up the logger, creating the stream, serializer, processor, data source,
-    and worker. It also sets up signal handlers for graceful shutdown and starts
-    the worker.
+    This function initializes the application, including loading the
+    configuration,setting up the logger, creating the stream, serializer,
+    processor, data source, and worker. It also sets up signal handlers for
+    graceful shutdown and starts the worker.
 
-    The function does not return under normal operation; it continues running until
-    a shutdown signal is received.
+    The function does not return under normal operation; it continues running
+    until a shutdown signal is received.
     """
     load_dotenv()
 
@@ -48,15 +48,14 @@ def main() -> None:
     processor = StreamProcessor(
         stream=stream,
         batch_size=app_config.batch_size,
-        flush_interval=2.0,
-        data_source=datasource,
+        flush_interval=app_config.flush_interval,
+        datasource=datasource,
         state_manager=state_manager,
     )
 
     # Create worker with state manager
     worker = Worker(processor)
 
-    # Signal handling and run
     def signal_handler(sig: Any, _frame: Any) -> None:
         logger.info("Shutdown signal received")
         worker.stop()

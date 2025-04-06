@@ -12,14 +12,14 @@ class StreamProcessor:
     def __init__(
         self,
         stream: Stream,
-        data_source: DataSource,
+        datasource: DataSource,
         state_manager: StateManager,
         batch_size: int,
         flush_interval: float,
     ) -> None:
         self.stream = stream
         self.serializer = Serializer()
-        self.data_source = data_source
+        self.datasource = datasource
         self.state_manager = state_manager
         self.batch_size = batch_size
         self.flush_interval = flush_interval
@@ -30,7 +30,7 @@ class StreamProcessor:
     def start(self) -> None:
         try:
             self._load_state()
-            self.data_source.connect()
+            self.datasource.connect()
             logger.info("Connected to data source")
         except Exception as e:
             error_msg = f"Failed to start processor: {str(e)}"
@@ -72,24 +72,24 @@ class StreamProcessor:
                 return
 
             logger.info(f"Resuming from saved position: {position}")
-            self.data_source.set_position(position)
+            self.datasource.set_position(position)
 
             # Log current position after setting
-            current_pos = self.data_source.get_position()
+            current_pos = self.datasource.get_position()
             logger.debug(f"Data source position after setting: {current_pos}")
         except Exception as e:
             logger.error(f"Error loading state: {e}")
 
     def _get_datasource_type(self) -> Optional[str]:
-        if hasattr(self.data_source, "SCHEMA_VERSION"):
-            schema_version = getattr(self.data_source, "SCHEMA_VERSION", "")
+        if hasattr(self.datasource, "SCHEMA_VERSION"):
+            schema_version = getattr(self.datasource, "SCHEMA_VERSION", "")
             if schema_version.startswith("mysql-"):
                 return "mysql"
 
-        if hasattr(self.data_source, "__class__") and hasattr(
-            self.data_source.__class__, "__name__"
+        if hasattr(self.datasource, "__class__") and hasattr(
+            self.datasource.__class__, "__name__"
         ):
-            class_name = self.data_source.__class__.__name__.lower()
+            class_name = self.datasource.__class__.__name__.lower()
             if "mysql" in class_name:
                 return "mysql"
 
@@ -97,31 +97,39 @@ class StreamProcessor:
         return None
 
     def _get_datasource_source(self) -> Optional[str]:
-        if hasattr(self.data_source, "host"):
-            host = getattr(self.data_source, "host")
+        if hasattr(self.datasource, "host"):
+            host = getattr(self.datasource, "host")
             if host:
                 logger.debug(f"Using host '{host}' as data source identifier")
                 return host
 
-        if hasattr(self.data_source, "connection_settings"):
-            conn_settings = getattr(self.data_source, "connection_settings", {})
+        if hasattr(self.datasource, "connection_settings"):
+            conn_settings = getattr(self.datasource, "connection_settings", {})
             if isinstance(conn_settings, dict) and "host" in conn_settings:
                 logger.debug(
-                    f"Using connection host '{conn_settings['host']}' as data source identifier"
+                    f"Using connection host '{conn_settings['host']}' as "
+                    "data source identifier"
                 )
                 return conn_settings["host"]
 
-        logger.warning("Could not determine data source identifier for state management")
+        logger.warning("Could not determine data source identifier for "
+                       "state management")
         return None
 
     def process_next(self) -> bool:
         try:
             if self._current_iterator is None:
-                self._current_iterator = self.data_source.listen()
+                self._current_iterator = self.datasource.listen()
 
             start_time = time.time()
             events_processed = 0
 
+            current_time = time.time()
+            time_since_last_flush = current_time - self.last_flush_time
+            logger.debug(f"Time since last flush: {time_since_last_flush}s, "
+                         f"flush interval: {self.flush_interval}s")
+
+            # Process events until batch size or time interval is reached
             while (events_processed < self.batch_size and
                    time.time() - start_time < self.flush_interval):
                 try:
@@ -135,9 +143,12 @@ class StreamProcessor:
                     break
 
             if self.buffer and (
-                events_processed >= self.batch_size or
+                len(self.buffer) >= self.batch_size or
                 time.time() - self.last_flush_time >= self.flush_interval
             ):
+                logger.debug(f"Flushing buffer size={len(self.buffer)}, "
+                             f"time since last flush={time.time()} - "
+                             f"{self.last_flush_time}s")
                 self.flush()
 
             return events_processed > 0
@@ -228,7 +239,7 @@ class StreamProcessor:
         try:
             self.flush()
             self.stream.close()
-            self.data_source.disconnect()
+            self.datasource.disconnect()
             logger.info("Processor stopped")
         except Exception as e:
             logger.error(f"Error stopping processor: {e}")
