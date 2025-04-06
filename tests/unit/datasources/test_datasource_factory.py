@@ -4,96 +4,102 @@ from stream_cdc.datasources.base import DataSource
 from stream_cdc.utils.exceptions import UnsupportedTypeError
 
 
-@pytest.fixture(autouse=True)
-def reset_datasource_factory():
-    """Reset the DataSourceFactory registry before and after each test."""
-    original_registry = DataSourceFactory.REGISTRY.copy()
-    DataSourceFactory.REGISTRY = {}
-    yield
-    DataSourceFactory.REGISTRY = original_registry
+class TestDataSourceFactory:
+    """Test cases for DataSourceFactory"""
 
+    @pytest.fixture(autouse=True)
+    def reset_datasource_factory(self):
+        """Reset the DataSourceFactory registry before and after each test."""
+        original_registry = DataSourceFactory.REGISTRY.copy()
+        DataSourceFactory.REGISTRY = {}
+        yield
+        DataSourceFactory.REGISTRY = original_registry
 
-class MockDataSource(DataSource):
-    """Mock implementation of DataSource for testing."""
+    class MockDataSource(DataSource):
+        """Mock implementation of DataSource for testing."""
 
-    def __init__(self, **kwargs):
-        self.init_args = kwargs
+        def __init__(self, **kwargs):
+            self.init_args = kwargs
 
-    def connect(self):
-        pass
+        def connect(self):
+            pass
 
-    def listen(self):
-        yield {"event": "test"}
+        def listen(self):
+            yield {"event": "test"}
 
-    def disconnect(self):
-        pass
+        def disconnect(self):
+            pass
 
+        def get_position(self):
+            return {}
 
-def test_register_datasource():
-    """Test registering a data source implementation."""
-    # Register a mock data source
-    DataSourceFactory.register_datasource("mock", MockDataSource)
+        def set_position(self):
+            pass
 
-    # Check that it was registered
-    assert "mock" in DataSourceFactory.REGISTRY
-    assert DataSourceFactory.REGISTRY["mock"] == MockDataSource
+    def test_register_datasource(self):
+        """Test registering a data source implementation."""
+        # Register a mock data source
+        DataSourceFactory.register_datasource("mock", self.MockDataSource)
 
+        # Check that it was registered
+        assert "mock" in DataSourceFactory.REGISTRY
+        assert DataSourceFactory.REGISTRY["mock"] == self.MockDataSource
 
-def test_register_datasource_case_insensitive():
-    """Test that data source registration is case insensitive."""
-    # Register with mixed case
-    DataSourceFactory.register_datasource("MockSource", MockDataSource)
+    def test_register_datasource_case_insensitive(self):
+        """Test that data source registration is case insensitive."""
+        # Register with mixed case
+        DataSourceFactory.register_datasource("MockSource", self.MockDataSource)
 
-    # Should be stored lowercase
-    assert "mocksource" in DataSourceFactory.REGISTRY
-    assert DataSourceFactory.REGISTRY["mocksource"] == MockDataSource
+        # Should be stored lowercase
+        assert "mocksource" in DataSourceFactory.REGISTRY
+        assert DataSourceFactory.REGISTRY["mocksource"] == self.MockDataSource
 
+    def test_create_datasource(self):
+        """Test creating a data source instance."""
+        # Register a mock data source
+        DataSourceFactory.register_datasource("mock", self.MockDataSource)
 
-def test_create_datasource():
-    """Test creating a data source instance."""
-    # Register a mock data source
-    DataSourceFactory.register_datasource("mock", MockDataSource)
+        # Create an instance with some arguments
+        datasource = DataSourceFactory.create("mock", host="localhost", port=3306)
 
-    # Create an instance with some arguments
-    datasource = DataSourceFactory.create("mock", host="localhost", port=3306)
+        # Check type and passed arguments
+        assert isinstance(datasource, self.MockDataSource)
+        assert datasource.init_args == {"host": "localhost", "port": 3306}
 
-    # Check type and passed arguments
-    assert isinstance(datasource, MockDataSource)
-    assert datasource.init_args == {"host": "localhost", "port": 3306}
+    def test_create_datasource_case_insensitive(self):
+        """Test that data source creation is case insensitive."""
+        # Register a mock data source
+        DataSourceFactory.register_datasource("mock", self.MockDataSource)
 
+        # Create with different case
+        datasource = DataSourceFactory.create("MOCK")
 
-def test_create_datasource_case_insensitive():
-    """Test that data source creation is case insensitive."""
-    # Register a mock data source
-    DataSourceFactory.register_datasource("mock", MockDataSource)
+        # Should still work
+        assert isinstance(datasource, self.MockDataSource)
 
-    # Create with different case
-    datasource = DataSourceFactory.create("MOCK")
+    def test_create_unsupported_datasource(self):
+        """Test error when creating an unsupported data source type."""
+        # Try to create an unregistered data source type
+        with pytest.raises(UnsupportedTypeError) as exc_info:
+            DataSourceFactory.create("unsupported")
 
-    # Should still work
-    assert isinstance(datasource, MockDataSource)
+        # Error message should contain the unsupported type and available types
+        assert "Unsupported data source type: unsupported" in str(exc_info.value)
+        assert "Supported types: []" in str(exc_info.value)
 
+    def test_create_unsupported_datasource_with_registered_types(self):
+        """Test error includes registered data source types."""
+        # Register some data sources
+        DataSourceFactory.register_datasource("mysql", self.MockDataSource)
+        DataSourceFactory.register_datasource("postgres", self.MockDataSource)
 
-def test_create_unsupported_datasource():
-    """Test error when creating an unsupported data source type."""
-    # Try to create an unregistered data source type
-    with pytest.raises(UnsupportedTypeError) as exc_info:
-        DataSourceFactory.create("unsupported")
+        # Try to create an unregistered data source type
+        with pytest.raises(UnsupportedTypeError) as exc_info:
+            DataSourceFactory.create("mongodb")
 
-    # Error message should contain the unsupported type and available types
-    assert "Unsupported data source type: unsupported" in str(exc_info.value)
-    assert "Supported types: []" in str(exc_info.value)
+        # Error should list available types
+        error_message = str(exc_info.value)
+        assert "Supported types:" in error_message
+        assert "mysql" in error_message
+        assert "postgres" in error_message
 
-
-def test_create_unsupported_datasource_with_registered_types():
-    """Test error includes registered data source types."""
-    # Register some data sources
-    DataSourceFactory.register_datasource("mysql", MockDataSource)
-    DataSourceFactory.register_datasource("postgres", MockDataSource)
-
-    # Try to create an unregistered data source type
-    with pytest.raises(UnsupportedTypeError) as exc_info:
-        DataSourceFactory.create("mongodb")
-
-    # Error should list available types
-    assert "Supported types: ['mysql', 'postgres']" in str(exc_info.value)
