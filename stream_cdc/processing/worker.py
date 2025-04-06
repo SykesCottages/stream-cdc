@@ -1,6 +1,5 @@
 from stream_cdc.utils.logger import logger
 import time
-from stream_cdc.datasources.factory import DataSource
 from stream_cdc.processing.processor import StreamProcessor
 from stream_cdc.utils.exceptions import ProcessingError
 
@@ -9,22 +8,22 @@ class Worker:
     """
     Main worker class that orchestrates the data flow pipeline.
 
-    This class connects a data source to a processor, continuously pulling changes
-    from the data source and passing them to the processor for processing and
-    eventual delivery to a stream.
+    This class connects a data source to a processor, continuously pulling
+    changes from the data source and passing them to the processor for
+    processing and eventual delivery to a stream.
     """
 
-    def __init__(
-        self, data_source: DataSource, processor: StreamProcessor
-    ) -> None:
+    def __init__(self, processor: StreamProcessor) -> None:
         """
         Initialize the worker with a data source and processor.
 
         Args:
-            data_source (DataSource): The data source to listen for changes from.
+            data_source (DataSource): The data source to listen for changes
+            from.
             processor (StreamProcessor): The processor to handle the changes.
+            state_manager (Optional[StateManager]): The state manager to
+            load/save state.
         """
-        self.data_source = data_source
         self.processor = processor
         self.running = True
 
@@ -41,19 +40,16 @@ class Worker:
         """
         try:
             logger.info("Worker Started")
-            self.data_source.connect()
-            logger.info("Connected to data source")
+            self.processor.start()
+
             while self.running:
-                for change in self.data_source.listen():
-                    if not self.running:
-                        break
-                    self.processor.process(change)
+                self.processor.process_next()
+
         except Exception as e:
             logger.error(f"Worker error: {e}")
             raise ProcessingError(f"Processing failed: {str(e)}")
         finally:
-            self.processor.close()
-            self.data_source.disconnect()
+            self.processor.stop()
             logger.info("Worker stopped gracefully")
 
     def stop(self) -> None:
