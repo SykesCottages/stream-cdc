@@ -16,4 +16,9 @@ data:
   AWS_ENDPOINT_URL: "https://sqs.eu-west-1.amazonaws.com"
   AWS_REGION: "eu-west-1"
   AWS_ACCESS_KEY_ID: "AKIAW6DYANTM6MNGYO7Y"
-  LOG_LEVEL: "DEBUG"
+  LOG_LEVEL: "INFO"
+  STATE_DYNAMODB_REGION: "eu-west-1"
+  STATE_DYNAMODB_TABLE: "DataSourceStateTracker"
+  STATE_DYNAMODB_ACCESS_KEY: "AKIAW6DYANTM6MNGYO7Y"
+  STATE_DYNAMODB_ENDPOINT_URL: "https://dynamodb.eu-west-1.amazonaws.com"
+
