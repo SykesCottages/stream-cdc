@@ -14,15 +14,15 @@ class Logger:
 
     _instance = None
 
-    def __init__(
-        self, log_level: str = "INFO", logger_name: Optional[str] = None
-    ):
+    def __init__(self, log_level: str = "INFO", logger_name: Optional[str] = None):
         """
         Initialize the logger with a specific log level and optional name.
 
         Args:
-            log_level (str): The logging level (e.g., "INFO", "DEBUG"). Defaults to "INFO".
-            logger_name (str, optional): The name of the logger. Defaults to APP_NAME or "stream-cdc".
+            log_level (str): The logging level (e.g., "INFO", "DEBUG").
+            Defaults to "INFO".
+            logger_name (str, optional): The name of the logger. Defaults to
+            APP_NAME or "stream-cdc".
         """
         self.logger_name = logger_name or os.getenv("APP_NAME", "stream-cdc")
         self.logger = logging.getLogger(self.logger_name)

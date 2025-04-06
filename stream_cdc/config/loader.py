@@ -30,7 +30,8 @@ class AppConfig(object):
         flush_interval = float(os.getenv("FLUSH_INTERVAL", "5.0"))
 
         logger.info(
-            f"Config: log_level={log_level}, batch_size={batch_size}, interval={flush_interval}"
+            f"Config: log_level={log_level}, batch_size={batch_size}, "
+            f"interval={flush_interval}"
         )
 
         return cls(

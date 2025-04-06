@@ -61,30 +61,22 @@ class TestMySQLSettingsValidator:
         """Test initialization with missing values."""
         # Missing host
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(
-                host=None, user="user", password="pass", port=3306
-            )
+            MySQLSettingsValidator(host=None, user="user", password="pass", port=3306)
         assert "Database host is required" in str(exc_info.value)
 
         # Missing user
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(
-                host="host", user=None, password="pass", port=3306
-            )
+            MySQLSettingsValidator(host="host", user=None, password="pass", port=3306)
         assert "Database user is required" in str(exc_info.value)
 
         # Missing password
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(
-                host="host", user="user", password=None, port=3306
-            )
+            MySQLSettingsValidator(host="host", user="user", password=None, port=3306)
         assert "Database password is required" in str(exc_info.value)
 
         # Missing port
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(
-                host="host", user="user", password="pass", port=None
-            )
+            MySQLSettingsValidator(host="host", user="user", password="pass", port=None)
         assert "Database port is required" in str(exc_info.value)
 
     def test_get_required_settings(self):
@@ -222,9 +214,7 @@ class TestMySQLSettingsValidator:
         with pytest.raises(ConfigurationError) as exc_info:
             validator.validate()
 
-        assert "Failed to connect to MySQL: Connection refused" in str(
-            exc_info.value
-        )
+        assert "Failed to connect to MySQL: Connection refused" in str(exc_info.value)
 
 
 class TestMySQLDataSource:
@@ -363,17 +353,9 @@ class TestMySQLDataSource:
                 assert mock_binlog_reader.call_args[1]["resume_stream"] is True
 
                 # Check event types
-                assert (
-                    WriteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                )
-                assert (
-                    UpdateRowsEvent
-                    in mock_binlog_reader.call_args[1]["only_events"]
-                )
-                assert (
-                    DeleteRowsEvent
-                    in mock_binlog_reader.call_args[1]["only_events"]
-                )
+                assert WriteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
+                assert UpdateRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
+                assert DeleteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
                 assert GtidEvent in mock_binlog_reader.call_args[1]["only_events"]
                 assert QueryEvent in mock_binlog_reader.call_args[1]["only_events"]
 
@@ -419,9 +401,7 @@ class TestMySQLDataSource:
                 with pytest.raises(DataSourceError) as exc_info:
                     data_source.connect()
 
-                assert "Failed to connect to MySQL: Client error" in str(
-                    exc_info.value
-                )
+                assert "Failed to connect to MySQL: Client error" in str(exc_info.value)
 
     def test_listen_without_connection(self, mysql_data_source):
         """Test listen method without prior connection."""
@@ -487,8 +467,10 @@ class TestMySQLDataSource:
         update_event.table = "users"
         update_event.timestamp = 1743598170
         update_event.rows = [
-            {"before": {"id": 1, "name": "Old User"},
-             "after": {"id": 1, "name": "Updated User"}}
+            {
+                "before": {"id": 1, "name": "Old User"},
+                "after": {"id": 1, "name": "Updated User"},
+            }
         ]
 
         delete_event = MagicMock(spec=DeleteRowsEvent)
@@ -499,12 +481,15 @@ class TestMySQLDataSource:
 
         # Initialize GTID first, then yield all event types
         mock_binlog_client.__iter__.return_value = [
-            gtid_event, write_event, update_event, delete_event
+            gtid_event,
+            write_event,
+            update_event,
+            delete_event,
         ]
 
         # Set the client directly
         mysql_data_source.client = mock_binlog_client
-        mysql_data_source.last_event_time = time.time()  # Initialize this to avoid reconnect
+        mysql_data_source.last_event_time = time.time()
 
         # Get events from listen generator
         events = list(mysql_data_source.listen())
@@ -552,19 +537,19 @@ class TestMySQLDataSource:
         )
 
     def test_disconnect(self, mysql_data_source):
-            """Test disconnect method."""
-            # Create a mock binlog client
-            mock_binlog_client = MagicMock()
+        """Test disconnect method."""
+        # Create a mock binlog client
+        mock_binlog_client = MagicMock()
 
-            # Set the client
-            mysql_data_source.client = mock_binlog_client
+        # Set the client
+        mysql_data_source.client = mock_binlog_client
 
-            # Disconnect
-            mysql_data_source.disconnect()
+        # Disconnect
+        mysql_data_source.disconnect()
 
-            # Client should be closed and set to None
-            mock_binlog_client.close.assert_called_once()
-            assert mysql_data_source.client is None
+        # Client should be closed and set to None
+        mock_binlog_client.close.assert_called_once()
+        assert mysql_data_source.client is None
 
     def test_disconnect_without_client(self, mysql_data_source):
         """Test disconnect method when no client exists."""
