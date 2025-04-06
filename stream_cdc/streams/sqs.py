@@ -31,11 +31,16 @@ class SQS(Stream):
         Initialize the SQS stream with configuration.
 
         Args:
-            queue_url (Optional[str]): The URL of the SQS queue. Defaults to SQS_QUEUE_URL environment variable.
-            region (Optional[str]): The AWS region. Defaults to AWS_REGION environment variable.
-            endpoint_url (Optional[str]): The AWS endpoint URL. Defaults to AWS_ENDPOINT_URL environment variable.
-            aws_access_key_id (Optional[str]): The AWS access key ID. Defaults to AWS_ACCESS_KEY_ID environment variable.
-            aws_secret_access_key (Optional[str]): The AWS secret access key. Defaults to AWS_SECRET_ACCESS_KEY environment variable.
+            queue_url (Optional[str]): The URL of the SQS queue. Defaults to
+            SQS_QUEUE_URL environment variable.
+            region (Optional[str]): The AWS region. Defaults to AWS_REGION
+            environment variable.
+            endpoint_url (Optional[str]): The AWS endpoint URL. Defaults to
+            AWS_ENDPOINT_URL environment variable.
+            aws_access_key_id (Optional[str]): The AWS access key ID. Defaults to
+            AWS_ACCESS_KEY_ID environment variable.
+            aws_secret_access_key (Optional[str]): The AWS secret access key.
+            Defaults to AWS_SECRET_ACCESS_KEY environment variable.
 
         Raises:
             ConfigurationError: If any required configuration parameter is missing.
@@ -89,11 +94,13 @@ class SQS(Stream):
         """
         Send messages to SQS, respecting SQS batch size limits.
 
-        Batches messages according to SQS's limitations (maximum of 10 messages per batch)
+        Batches messages according to SQS's limitations
+        (maximum of 10 messages per batch)
         and sends them to the configured queue.
 
         Args:
-            messages (List[Any]): The messages to send. Each message should be serializable to JSON.
+            messages (List[Any]): The messages to send. Each message should be
+            serializable to JSON.
 
         Raises:
             StreamError: If message conversion or sending fails.
@@ -131,7 +138,8 @@ class SQS(Stream):
             List[Dict]: The formatted messages ready for sending to SQS.
 
         Raises:
-            StreamError: If a message cannot be converted to JSON or exceeds SQS size limits.
+            StreamError: If a message cannot be converted to JSON or exceeds SQS size
+            limits.
         """
         entries = []
 

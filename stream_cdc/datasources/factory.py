@@ -35,7 +35,8 @@ class DataSourceFactory:
 
         Args:
             datasource_type (str): The type of data source to create.
-            **kwargs: Configuration parameters to pass to the data source implementation.
+            **kwargs: Configuration parameters to pass to the data source
+            implementation.
 
         Returns:
             DataSource: An initialized DataSource implementation.
@@ -49,10 +50,12 @@ class DataSourceFactory:
         if normalized_type not in cls.REGISTRY:
             supported = list(cls.REGISTRY.keys())
             logger.error(
-                f"Unsupported data source type: {datasource_type}. Supported types: {supported}"
+                f"Unsupported data source type: {datasource_type}. Supported types: "
+                f"{supported}"
             )
             raise UnsupportedTypeError(
-                f"Unsupported data source type: {datasource_type}. Supported types: {supported}"
+                f"Unsupported data source type: {datasource_type}. Supported types: "
+                f"{supported}"
             )
 
         datasource_class = cls.REGISTRY[normalized_type]

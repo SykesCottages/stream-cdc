@@ -1,6 +1,5 @@
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import patch
 from stream_cdc.utils.serializer import Serializer
 
 

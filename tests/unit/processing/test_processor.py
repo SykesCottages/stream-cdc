@@ -36,7 +36,11 @@ class TestStreamProcessor:
             flush_interval=2.0,
         )
 
-    def test_processor_init(self, processor, mock_stream, mock_datasource, mock_state_manager):
+    def test_processor_init(self,
+                            processor,
+                            mock_stream,
+                            mock_datasource,
+                            mock_state_manager):
         """Test processor initialization."""
         assert processor.stream == mock_stream
         assert processor.datasource == mock_datasource
@@ -50,7 +54,8 @@ class TestStreamProcessor:
     def test_process_single_event(self, processor):
         """Test processing a single event."""
         # Process an event with metadata
-        event = {"metadata": {"position": "gtid:123", "datasource_type": "mysql", "source": "localhost"}}
+        event = {"metadata": {"position": "gtid:123", "datasource_type": "mysql",
+                              "source": "localhost"}}
 
         # Process event
         processor.process(event)

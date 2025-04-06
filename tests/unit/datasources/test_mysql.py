@@ -504,7 +504,7 @@ class TestMySQLDataSource:
 
         # Set the client directly
         mysql_data_source.client = mock_binlog_client
-        mysql_data_source.last_event_time = time.time()  # Initialize this to avoid reconnect
+        mysql_data_source.last_event_time = time.time()
 
         # Get events from listen generator
         events = list(mysql_data_source.listen())

@@ -214,8 +214,10 @@ class StreamProcessor:
             )
 
             # Avoid saving the same position repeatedly
-            if hasattr(self, "_last_saved_position") and self._last_saved_position == position:
-                logger.debug(f"Position {position} already saved, skipping duplicate save")
+            if (hasattr(self, "_last_saved_position")
+                    and self._last_saved_position == position):
+                logger.debug(f"Position {position} already saved, skipping "
+                             "duplicate save")
                 return
 
             logger.debug(f"Saving position: {position}")

@@ -1,4 +1,4 @@
-from typing import Generator, Any, Dict, Optional, Union, List
+from typing import Generator, Any, Dict, Optional, Union
 import os
 import time
 import pymysql
@@ -205,18 +205,17 @@ class MySQLDataSource(DataSource):
         self._validate_settings()
 
         try:
-            # No stored position - connect normally
             if not self.current_gtid:
                 logger.info("No stored position, connecting from current position")
                 self.client = self._create_binlog_client()
                 logger.info("Connected to MySQL binlog stream")
                 return
 
-            # Try to resume from stored position
             logger.info(f"Attempting to resume from GTID: {self.current_gtid}")
             try:
                 # Create a proper GTID set for MySQL
-                gtid_set = self.current_gtid.split(':')[0] + ':1-' + self.current_gtid.split(':')[1]
+                gtid_set = (self.current_gtid.split(':')[0] + ':1-' +
+                    self.current_gtid.split(':')[1])
                 logger.info(f"Using GTID set for auto_position: {gtid_set}")
 
                 self.client = self._create_binlog_client(auto_position=gtid_set)
@@ -397,7 +396,8 @@ class MySQLDataSource(DataSource):
             logger.info(f"Set starting GTID position to {self.current_gtid}")
         elif "last_position" in position:
             self.current_gtid = position["last_position"]
-            logger.info(f"Set starting GTID position to {self.current_gtid} (from last_position)")
+            logger.info(f"Set starting GTID position to {self.current_gtid} "
+                        "(from last_position)")
         else:
             logger.warning("No valid GTID position found in the provided position data")
             return
