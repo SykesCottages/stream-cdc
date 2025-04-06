@@ -112,8 +112,9 @@ class StreamProcessor:
                 )
                 return conn_settings["host"]
 
-        logger.warning("Could not determine data source identifier for "
-                       "state management")
+        logger.warning(
+            "Could not determine data source identifier for state management"
+        )
         return None
 
     def process_next(self) -> bool:
@@ -126,12 +127,16 @@ class StreamProcessor:
 
             current_time = time.time()
             time_since_last_flush = current_time - self.last_flush_time
-            logger.debug(f"Time since last flush: {time_since_last_flush}s, "
-                         f"flush interval: {self.flush_interval}s")
+            logger.debug(
+                f"Time since last flush: {time_since_last_flush}s, "
+                f"flush interval: {self.flush_interval}s"
+            )
 
             # Process events until batch size or time interval is reached
-            while (events_processed < self.batch_size and
-                   time.time() - start_time < self.flush_interval):
+            while (
+                events_processed < self.batch_size
+                and time.time() - start_time < self.flush_interval
+            ):
                 try:
                     event = next(self._current_iterator)
                     self.process(event)
@@ -143,12 +148,14 @@ class StreamProcessor:
                     break
 
             if self.buffer and (
-                len(self.buffer) >= self.batch_size or
-                time.time() - self.last_flush_time >= self.flush_interval
+                len(self.buffer) >= self.batch_size
+                or time.time() - self.last_flush_time >= self.flush_interval
             ):
-                logger.debug(f"Flushing buffer size={len(self.buffer)}, "
-                             f"time since last flush={time.time()} - "
-                             f"{self.last_flush_time}s")
+                logger.debug(
+                    f"Flushing buffer size={len(self.buffer)}, "
+                    f"time since last flush={time.time()} - "
+                    f"{self.last_flush_time}s"
+                )
                 self.flush()
 
             return events_processed > 0
@@ -168,8 +175,10 @@ class StreamProcessor:
         self.buffer.append(serialized_event)
         logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
 
-        if (len(self.buffer) >= self.batch_size or
-            time.time() - self.last_flush_time >= self.flush_interval):
+        if (
+            len(self.buffer) >= self.batch_size
+            or time.time() - self.last_flush_time >= self.flush_interval
+        ):
             self.flush()
 
     def flush(self) -> None:
@@ -214,8 +223,13 @@ class StreamProcessor:
             )
 
             # Avoid saving the same position repeatedly
-            if hasattr(self, "_last_saved_position") and self._last_saved_position == position:
-                logger.debug(f"Position {position} already saved, skipping duplicate save")
+            if (
+                hasattr(self, "_last_saved_position")
+                and self._last_saved_position == position
+            ):
+                logger.debug(
+                    f"Position {position} already saved, skipping duplicate save"
+                )
                 return
 
             logger.debug(f"Saving position: {position}")
@@ -243,4 +257,3 @@ class StreamProcessor:
             logger.info("Processor stopped")
         except Exception as e:
             logger.error(f"Error stopping processor: {e}")
-

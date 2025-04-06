@@ -17,9 +17,7 @@ class Dynamodb(StateManager):
         self.aws_access_key = os.getenv("STATE_DYNAMODB_ACCESS_KEY")
         self.aws_secret_key = os.getenv("STATE_DYNAMODB_SECRET_KEY")
         self.table_name = os.getenv("STATE_DYNAMODB_TABLE")
-        self.connect_timeout = float(
-            os.getenv("STATE_DYNAMODB_CONNECT_TIMEOUT", "5")
-        )
+        self.connect_timeout = float(os.getenv("STATE_DYNAMODB_CONNECT_TIMEOUT", "5"))
         self.read_timeout = float(os.getenv("STATE_DYNAMODB_READ_TIMEOUT", "5"))
 
         logger.debug(
@@ -112,9 +110,7 @@ class Dynamodb(StateManager):
             )
 
             if "Item" not in response:
-                logger.info(
-                    f"No state found for {datasource_type}:{datasource_source}"
-                )
+                logger.info(f"No state found for {datasource_type}:{datasource_source}")
                 return None
 
             result = {}
@@ -131,4 +127,3 @@ class Dynamodb(StateManager):
         except Exception as e:
             logger.error(f"Failed to read state: {e}")
             return None
-

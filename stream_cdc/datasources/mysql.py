@@ -1,4 +1,4 @@
-from typing import Generator, Any, Dict, Optional, Union, List
+from typing import Generator, Any, Dict, Optional, Union
 import os
 import time
 import pymysql
@@ -28,9 +28,7 @@ class MySQLSettingsValidator:
         if not user:
             raise ConfigurationError("Database user is required for validation")
         if not password:
-            raise ConfigurationError(
-                "Database password is required for validation"
-            )
+            raise ConfigurationError("Database password is required for validation")
         if not port:
             raise ConfigurationError("Database port is required for validation")
 
@@ -69,9 +67,7 @@ class MySQLSettingsValidator:
             actual = actual_settings.get(setting)
 
             if actual is None:
-                logger.error(
-                    f"MySQL setting {setting} not found in server variables"
-                )
+                logger.error(f"MySQL setting {setting} not found in server variables")
                 raise ConfigurationError(f"MySQL setting {setting} not found")
 
             if actual.upper() != expected.upper():
@@ -205,18 +201,20 @@ class MySQLDataSource(DataSource):
         self._validate_settings()
 
         try:
-            # No stored position - connect normally
             if not self.current_gtid:
                 logger.info("No stored position, connecting from current position")
                 self.client = self._create_binlog_client()
                 logger.info("Connected to MySQL binlog stream")
                 return
 
-            # Try to resume from stored position
             logger.info(f"Attempting to resume from GTID: {self.current_gtid}")
             try:
                 # Create a proper GTID set for MySQL
-                gtid_set = self.current_gtid.split(':')[0] + ':1-' + self.current_gtid.split(':')[1]
+                gtid_set = (
+                    self.current_gtid.split(":")[0]
+                    + ":1-"
+                    + self.current_gtid.split(":")[1]
+                )
                 logger.info(f"Using GTID set for auto_position: {gtid_set}")
 
                 self.client = self._create_binlog_client(auto_position=gtid_set)
@@ -225,6 +223,7 @@ class MySQLDataSource(DataSource):
             except Exception as e:
                 logger.error(f"Failed to resume from GTID {self.current_gtid}: {e}")
                 import traceback
+
                 logger.error(f"Exception details: {traceback.format_exc()}")
 
             # Fall back to connecting without position
@@ -250,7 +249,7 @@ class MySQLDataSource(DataSource):
             # Check if query is bytes and decode if needed
             query = event.query
             if isinstance(query, bytes):
-                query = query.decode('utf-8')
+                query = query.decode("utf-8")
             elif not isinstance(query, str):
                 logger.warning(f"Query is not a string or bytes: {type(query)}")
                 return
@@ -274,8 +273,8 @@ class MySQLDataSource(DataSource):
 
         # Parse and compare transaction numbers if available
         try:
-            old_txn = int(old_gtid.split(':')[1])
-            new_txn = int(event.gtid.split(':')[1])
+            old_txn = int(old_gtid.split(":")[1])
+            new_txn = int(event.gtid.split(":")[1])
 
             if new_txn < old_txn:
                 logger.warning(f"GTID went backward: {old_gtid} -> {event.gtid}")
@@ -397,7 +396,10 @@ class MySQLDataSource(DataSource):
             logger.info(f"Set starting GTID position to {self.current_gtid}")
         elif "last_position" in position:
             self.current_gtid = position["last_position"]
-            logger.info(f"Set starting GTID position to {self.current_gtid} (from last_position)")
+            logger.info(
+                f"Set starting GTID position to {self.current_gtid} "
+                "(from last_position)"
+            )
         else:
             logger.warning("No valid GTID position found in the provided position data")
             return

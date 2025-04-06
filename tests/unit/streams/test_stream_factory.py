@@ -89,4 +89,3 @@ class TestStreamFactory:
         assert "Supported types:" in error_message
         assert "mock1" in error_message
         assert "mock2" in error_message
-

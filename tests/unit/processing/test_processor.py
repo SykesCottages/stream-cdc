@@ -36,7 +36,9 @@ class TestStreamProcessor:
             flush_interval=2.0,
         )
 
-    def test_processor_init(self, processor, mock_stream, mock_datasource, mock_state_manager):
+    def test_processor_init(
+        self, processor, mock_stream, mock_datasource, mock_state_manager
+    ):
         """Test processor initialization."""
         assert processor.stream == mock_stream
         assert processor.datasource == mock_datasource
@@ -50,7 +52,13 @@ class TestStreamProcessor:
     def test_process_single_event(self, processor):
         """Test processing a single event."""
         # Process an event with metadata
-        event = {"metadata": {"position": "gtid:123", "datasource_type": "mysql", "source": "localhost"}}
+        event = {
+            "metadata": {
+                "position": "gtid:123",
+                "datasource_type": "mysql",
+                "source": "localhost",
+            }
+        }
 
         # Process event
         processor.process(event)
@@ -66,6 +74,7 @@ class TestStreamProcessor:
         """Test flushing when batch size is reached."""
         # Create a side effect to capture the messages sent to the stream
         sent_messages = []
+
         def capture_messages(messages):
             sent_messages.extend(messages)
             return None
@@ -75,13 +84,15 @@ class TestStreamProcessor:
 
         # Process events up to batch size
         for i in range(3):
-            processor.process({
-                "metadata": {
-                    "position": f"gtid:{i}",
-                    "datasource_type": "mysql",
-                    "source": "localhost"
+            processor.process(
+                {
+                    "metadata": {
+                        "position": f"gtid:{i}",
+                        "datasource_type": "mysql",
+                        "source": "localhost",
+                    }
                 }
-            })
+            )
 
         # Buffer should be empty after flush
         assert len(processor.buffer) == 0
@@ -104,13 +115,15 @@ class TestStreamProcessor:
         processor.last_flush_time = time.time() - 3.0  # 3 seconds ago
 
         # Process a single event
-        processor.process({
-            "metadata": {
-                "position": "gtid:123",
-                "datasource_type": "mysql",
-                "source": "localhost"
+        processor.process(
+            {
+                "metadata": {
+                    "position": "gtid:123",
+                    "datasource_type": "mysql",
+                    "source": "localhost",
+                }
             }
-        })
+        )
 
         # Buffer should be empty after time-based flush
         assert len(processor.buffer) == 0
@@ -137,14 +150,14 @@ class TestStreamProcessor:
                 "metadata": {
                     "position": "gtid:1",
                     "datasource_type": "mysql",
-                    "source": "localhost"
+                    "source": "localhost",
                 }
             },
             {
                 "metadata": {
                     "position": "gtid:2",
                     "datasource_type": "mysql",
-                    "source": "localhost"
+                    "source": "localhost",
                 }
             },
         ]
@@ -179,7 +192,7 @@ class TestStreamProcessor:
                 "metadata": {
                     "position": "gtid:1",
                     "datasource_type": "mysql",
-                    "source": "localhost"
+                    "source": "localhost",
                 }
             },
         ]
@@ -196,4 +209,3 @@ class TestStreamProcessor:
 
         # Data source should be disconnected
         processor.datasource.disconnect.assert_called_once()
-
