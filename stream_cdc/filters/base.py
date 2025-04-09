@@ -6,7 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 # Creates an alias for message type
-Message = Dict[str,Any]
+Message = Dict[str, Any]
+
 
 class FilterException(Exception):
     """Exception raised for errors in filter operations.
@@ -14,6 +15,7 @@ class FilterException(Exception):
     This exception is used to signal errors that occur during filtering operations,
     allowing for consistent error handling across the filters module.
     """
+
     pass
 
 
@@ -94,4 +96,3 @@ class FilterChain:
         for message_filter in self.filters:
             filtered_message = message_filter.filter(filtered_message)
         return filtered_message
-

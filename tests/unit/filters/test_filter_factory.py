@@ -25,4 +25,3 @@ class TestFilterFactory:
 
         # Verify the chain contains the provided filters
         assert chain.filters == filters
-

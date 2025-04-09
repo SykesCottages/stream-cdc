@@ -50,6 +50,7 @@ class TestFilterChain:
 
     def test_chain_with_non_messagefilter_objects(self):
         """Test that FilterChain works with objects that implement filter method but aren't MessageFilter."""
+
         class CustomFilter:
             def filter(self, message):
                 message["custom"] = "modified"
@@ -69,6 +70,7 @@ class TestFilterFactory:
 
     def test_create_filter_chain_with_messagefilters(self):
         """Test that create_filter_chain works with MessageFilter objects."""
+
         # Create concrete MessageFilter implementations
         class TestFilter(MessageFilter):
             def filter(self, message):
@@ -103,6 +105,7 @@ class TestFilterFactory:
 
     def test_create_filter_chain_with_any_filterlike(self):
         """Test that create_filter_chain works with any object implementing filter method."""
+
         class CustomFilter:
             def __init__(self, suffix):
                 self.suffix = suffix
@@ -128,6 +131,7 @@ class TestFilterLikeProtocol:
 
     def test_messagefilter_is_filterlike(self):
         """Test that MessageFilter implementations satisfy the FilterLike Protocol."""
+
         class ConcreteFilter(MessageFilter):
             def filter(self, message):
                 return message
@@ -156,6 +160,7 @@ class TestFilterLikeProtocol:
 
     def test_any_object_with_filter_method_is_filterlike(self):
         """Test that any object with a filter method satisfies the FilterLike Protocol."""
+
         class CustomObject:
             def filter(self, message):
                 message["custom"] = True
@@ -167,4 +172,3 @@ class TestFilterLikeProtocol:
         # Verify the custom object works in the chain
         result = chain.apply({"test": "value"})
         assert result == {"test": "value", "custom": True}
-

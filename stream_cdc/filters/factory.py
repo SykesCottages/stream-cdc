@@ -23,4 +23,3 @@ class FilterFactory:
             A configured FilterChain containing the provided filters.
         """
         return FilterChain(filters)
-
