@@ -86,7 +86,8 @@ class TestFilterFactory:
         assert chain.filters == filters
 
     def test_create_filter_chain_with_mocks(self):
-        """Test that create_filter_chain works with mock objects that have filter method."""
+        """Test that create_filter_chain works with mock objects that have
+        filter method."""
         mock_filter1 = MagicMock(spec=MessageFilter)
         mock_filter1.filter.return_value = {"result": "mock1"}
 
