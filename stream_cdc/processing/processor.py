@@ -52,7 +52,7 @@ class StreamProcessor:
                 )
                 return
 
-            # Directly query DynamoDB for debugging
+            # Directly query DynamoDB for debugging @ToDo should remove this.
             logger.debug(f"Retrieving state for {datasource_type}:{datasource_source}")
             position = self.state_manager.read(
                 datasource_type=datasource_type,
