@@ -57,4 +57,3 @@ class Worker:
         self.running = False
         time.sleep(2)
         exit(0)
-

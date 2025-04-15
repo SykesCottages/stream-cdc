@@ -72,7 +72,9 @@ def test_serialize_array(serializer):
 def test_serialize_complex_nested_structure(serializer):
     """Test serializing a complex nested structure."""
     data = {
-        "level1": {"level2": {"level3": [{"key": "value1"}, {"key": "value2"}]}},
+        "level1": {
+            "level2": {"level3": [{"key": "value1"}, {"key": "value2"}]}
+        },
         "numbers": [1, 2, 3],
     }
     result = serializer.serialize(data)

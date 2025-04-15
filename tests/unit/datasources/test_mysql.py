@@ -61,22 +61,30 @@ class TestMySQLSettingsValidator:
         """Test initialization with missing values."""
         # Missing host
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(host=None, user="user", password="pass", port=3306)
+            MySQLSettingsValidator(
+                host=None, user="user", password="pass", port=3306
+            )
         assert "Database host is required" in str(exc_info.value)
 
         # Missing user
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(host="host", user=None, password="pass", port=3306)
+            MySQLSettingsValidator(
+                host="host", user=None, password="pass", port=3306
+            )
         assert "Database user is required" in str(exc_info.value)
 
         # Missing password
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(host="host", user="user", password=None, port=3306)
+            MySQLSettingsValidator(
+                host="host", user="user", password=None, port=3306
+            )
         assert "Database password is required" in str(exc_info.value)
 
         # Missing port
         with pytest.raises(ConfigurationError) as exc_info:
-            MySQLSettingsValidator(host="host", user="user", password="pass", port=None)
+            MySQLSettingsValidator(
+                host="host", user="user", password="pass", port=None
+            )
         assert "Database port is required" in str(exc_info.value)
 
     def test_get_required_settings(self):
@@ -209,12 +217,16 @@ class TestMySQLSettingsValidator:
 
         # Simulate connection error
         mock_pymysql.Error = Exception
-        mock_pymysql.connect.side_effect = mock_pymysql.Error("Connection refused")
+        mock_pymysql.connect.side_effect = mock_pymysql.Error(
+            "Connection refused"
+        )
 
         with pytest.raises(ConfigurationError) as exc_info:
             validator.validate()
 
-        assert "Failed to connect to MySQL: Connection refused" in str(exc_info.value)
+        assert "Failed to connect to MySQL: Connection refused" in str(
+            exc_info.value
+        )
 
 
 class TestMySQLDataSource:
@@ -353,11 +365,24 @@ class TestMySQLDataSource:
                 assert mock_binlog_reader.call_args[1]["resume_stream"] is True
 
                 # Check event types
-                assert WriteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert UpdateRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert DeleteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert GtidEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert QueryEvent in mock_binlog_reader.call_args[1]["only_events"]
+                assert (
+                    WriteRowsEvent
+                    in mock_binlog_reader.call_args[1]["only_events"]
+                )
+                assert (
+                    UpdateRowsEvent
+                    in mock_binlog_reader.call_args[1]["only_events"]
+                )
+                assert (
+                    DeleteRowsEvent
+                    in mock_binlog_reader.call_args[1]["only_events"]
+                )
+                assert (
+                    GtidEvent in mock_binlog_reader.call_args[1]["only_events"]
+                )
+                assert (
+                    QueryEvent in mock_binlog_reader.call_args[1]["only_events"]
+                )
 
     def test_connect_validation_failure(self):
         """Test connect method with validation failure."""
@@ -401,7 +426,9 @@ class TestMySQLDataSource:
                 with pytest.raises(DataSourceError) as exc_info:
                     data_source.connect()
 
-                assert "Failed to connect to MySQL: Client error" in str(exc_info.value)
+                assert "Failed to connect to MySQL: Client error" in str(
+                    exc_info.value
+                )
 
     def test_listen_without_connection(self, mysql_data_source):
         """Test listen method without prior connection."""
@@ -433,7 +460,9 @@ class TestMySQLDataSource:
 
         # Set the client directly
         mysql_data_source.client = mock_binlog_client
-        mysql_data_source.last_event_time = time.time()  # Initialize to avoid reconnect
+        mysql_data_source.last_event_time = (
+            time.time()
+        )  # Initialize to avoid reconnect
 
         # Get events from listen generator
         events = list(mysql_data_source.listen())
@@ -443,8 +472,13 @@ class TestMySQLDataSource:
         assert events[0]["spec"]["database"] == "testdb"
         assert events[0]["spec"]["table"] == "users"
         assert events[0]["spec"]["event_type"] == "Insert"
-        assert events[0]["spec"]["row"] == {"data": {"id": 1, "name": "Test User"}}
-        assert events[0]["spec"]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
+        assert events[0]["spec"]["row"] == {
+            "data": {"id": 1, "name": "Test User"}
+        }
+        assert (
+            events[0]["spec"]["gtid"]
+            == "12345678-1234-1234-1234-123456789abc:1"
+        )
 
     def test_listen_with_different_event_types(self, mysql_data_source):
         """Test listen method with different event types."""
@@ -527,7 +561,9 @@ class TestMySQLDataSource:
 
         # Set the client directly
         mysql_data_source.client = mock_binlog_client
-        mysql_data_source.last_event_time = time.time()  # Initialize to avoid reconnect
+        mysql_data_source.last_event_time = (
+            time.time()
+        )  # Initialize to avoid reconnect
 
         with pytest.raises(DataSourceError) as exc_info:
             next(mysql_data_source.listen())

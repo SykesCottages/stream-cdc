@@ -56,7 +56,11 @@ def test_size_filtering():
             "content": "This is a small message that won't be filtered",
             "metadata": {"type": "test"},
         },
-        {"id": "large_message", "content": "X" * 100000, "metadata": {"type": "test"}},
+        {
+            "id": "large_message",
+            "content": "X" * 100000,
+            "metadata": {"type": "test"},
+        },
         {
             "id": "mixed_message",
             "content": "Normal content",

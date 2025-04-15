@@ -58,7 +58,9 @@ class Coordinator:
     def _load_state(self) -> None:
         """Load the last saved state and configure the datasource."""
         if not self.state_manager:
-            logger.warning("No state manager configured, skipping state loading")
+            logger.warning(
+                "No state manager configured, skipping state loading"
+            )
             return
 
         try:
@@ -66,8 +68,9 @@ class Coordinator:
             datasource_source = self._get_datasource_source()
 
             if not datasource_type or not datasource_source:
-                logger.warning("Unable to determine data source type or "
-                               "source identifier")
+                logger.warning(
+                    "Unable to determine data source type or source identifier"
+                )
                 return
 
             position = self.state_manager.read(
@@ -76,7 +79,9 @@ class Coordinator:
             )
 
             if not position:
-                logger.info("No saved state found, starting from default position")
+                logger.info(
+                    "No saved state found, starting from default position"
+                )
                 return
 
             logger.info(f"Retrieved state from storage: {position}")
@@ -104,7 +109,9 @@ class Coordinator:
             if "mysql" in class_name:
                 return "mysql"
 
-        logger.warning("Could not determine data source type for state management")
+        logger.warning(
+            "Could not determine data source type for state management"
+        )
         return None
 
     def _get_datasource_source(self) -> Optional[str]:
@@ -119,8 +126,9 @@ class Coordinator:
             if isinstance(conn_settings, dict) and "host" in conn_settings:
                 return conn_settings["host"]
 
-        logger.warning("Could not determine data source identifier for "
-                       "state management")
+        logger.warning(
+            "Could not determine data source identifier for state management"
+        )
         return None
 
     def process_next(self) -> bool:
@@ -230,8 +238,10 @@ class Coordinator:
                 hasattr(self, "_last_saved_position")
                 and self._last_saved_position == position
             ):
-                logger.debug(f"Position {position} already saved, skipping "
-                             "duplicate save")
+                logger.debug(
+                    f"Position {position} already saved, skipping "
+                    "duplicate save"
+                )
                 return
 
             self.state_manager.store(
@@ -242,8 +252,10 @@ class Coordinator:
 
             self._last_saved_position = position
 
-            logger.debug(f"Updated state for {datasource_type}:"
-             f"{datasource_source} to {position}")
+            logger.debug(
+                f"Updated state for {datasource_type}:"
+                f"{datasource_source} to {position}"
+            )
         except Exception as e:
             logger.error(f"Failed to save state: {e}")
 
@@ -257,4 +269,3 @@ class Coordinator:
             logger.info("Coordinator stopped")
         except Exception as e:
             logger.error(f"Error stopping coordinator: {e}")
-

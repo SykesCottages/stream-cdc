@@ -28,7 +28,9 @@ class MySQLSettingsValidator:
         if not user:
             raise ConfigurationError("Database user is required for validation")
         if not password:
-            raise ConfigurationError("Database password is required for validation")
+            raise ConfigurationError(
+                "Database password is required for validation"
+            )
         if not port:
             raise ConfigurationError("Database port is required for validation")
 
@@ -67,7 +69,9 @@ class MySQLSettingsValidator:
             actual = actual_settings.get(setting)
 
             if actual is None:
-                logger.error(f"MySQL setting {setting} not found in server variables")
+                logger.error(
+                    f"MySQL setting {setting} not found in server variables"
+                )
                 raise ConfigurationError(f"MySQL setting {setting} not found")
 
             if actual.upper() != expected.upper():
@@ -202,7 +206,9 @@ class MySQLDataSource(DataSource):
 
         try:
             if not self.current_gtid:
-                logger.info("No stored position, connecting from current position")
+                logger.info(
+                    "No stored position, connecting from current position"
+                )
                 self.client = self._create_binlog_client()
                 logger.info("Connected to MySQL binlog stream")
                 return
@@ -218,10 +224,14 @@ class MySQLDataSource(DataSource):
                 logger.info(f"Using GTID set for auto_position: {gtid_set}")
 
                 self.client = self._create_binlog_client(auto_position=gtid_set)
-                logger.info(f"Successfully connected using GTID set: {gtid_set}")
+                logger.info(
+                    f"Successfully connected using GTID set: {gtid_set}"
+                )
                 return
             except Exception as e:
-                logger.error(f"Failed to resume from GTID {self.current_gtid}: {e}")
+                logger.error(
+                    f"Failed to resume from GTID {self.current_gtid}: {e}"
+                )
                 import traceback
 
                 logger.error(f"Exception details: {traceback.format_exc()}")
@@ -256,7 +266,9 @@ class MySQLDataSource(DataSource):
 
             if query == "COMMIT":
                 self.transaction_complete = True
-                logger.debug(f"Transaction {self.last_seen_event_gtid} COMMITTED")
+                logger.debug(
+                    f"Transaction {self.last_seen_event_gtid} COMMITTED"
+                )
         except Exception as e:
             logger.warning(f"Failed to process query: {e}")
 
@@ -277,7 +289,9 @@ class MySQLDataSource(DataSource):
             new_txn = int(event.gtid.split(":")[1])
 
             if new_txn < old_txn:
-                logger.warning(f"GTID went backward: {old_gtid} -> {event.gtid}")
+                logger.warning(
+                    f"GTID went backward: {old_gtid} -> {event.gtid}"
+                )
             elif new_txn > old_txn + 1:
                 logger.warning(
                     f"GTID skipped: {old_gtid} -> {event.gtid}, "
@@ -288,13 +302,17 @@ class MySQLDataSource(DataSource):
         except (IndexError, ValueError):
             logger.debug(f"Updated current GTID to: {self.current_gtid}")
 
-    def _process_row_event(self, event) -> Generator[Dict[str, Any], None, None]:
+    def _process_row_event(
+        self, event
+    ) -> Generator[Dict[str, Any], None, None]:
         if not self.last_seen_event_gtid:
             logger.warning("Received row event before any GTID event")
             return
 
         event_type = self._get_event_type(event)
-        transaction_status = "COMPLETE" if self.transaction_complete else "IN_PROGRESS"
+        transaction_status = (
+            "COMPLETE" if self.transaction_complete else "IN_PROGRESS"
+        )
 
         for row in event.rows:
             metadata = {
@@ -401,5 +419,7 @@ class MySQLDataSource(DataSource):
                 "(from last_position)"
             )
         else:
-            logger.warning("No valid GTID position found in the provided position data")
+            logger.warning(
+                "No valid GTID position found in the provided position data"
+            )
             return

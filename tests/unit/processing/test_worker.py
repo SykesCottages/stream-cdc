@@ -100,4 +100,3 @@ class TestWorker:
 
                 # Verify worker exits with code 0
                 mock_exit.assert_called_once_with(0)
-

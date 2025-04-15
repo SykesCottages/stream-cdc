@@ -14,7 +14,9 @@ class Logger:
 
     _instance = None
 
-    def __init__(self, log_level: str = "INFO", logger_name: Optional[str] = None):
+    def __init__(
+        self, log_level: str = "INFO", logger_name: Optional[str] = None
+    ):
         """
         Initialize the logger with a specific log level and optional name.
 
