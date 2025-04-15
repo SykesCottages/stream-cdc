@@ -5,14 +5,7 @@ from stream_cdc.streams.base import Stream
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.state.base import StateManager
 from stream_cdc.utils.exceptions import ProcessingError
-
-
-class EventProcessor(Protocol):
-    """Protocol defining an event processor component."""
-
-    def process(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Process a single event and return the processed result."""
-        ...
+from stream_cdc.processing.processors import EventProcessor
 
 
 class FlushPolicy(Protocol):
