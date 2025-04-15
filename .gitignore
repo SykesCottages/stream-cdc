@@ -51,3 +51,4 @@ build/
 *.egg
 .env
 secrets.yml
+configmap.yml

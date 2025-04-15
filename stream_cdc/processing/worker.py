@@ -1,6 +1,6 @@
-from stream_cdc.utils.logger import logger
 import time
-from stream_cdc.processing.processor import StreamProcessor
+from stream_cdc.utils.logger import logger
+from stream_cdc.processing.coordinator import Coordinator
 from stream_cdc.utils.exceptions import ProcessingError
 
 
@@ -8,48 +8,42 @@ class Worker:
     """
     Main worker class that orchestrates the data flow pipeline.
 
-    This class connects a data source to a processor, continuously pulling
-    changes from the data source and passing them to the processor for
-    processing and eventual delivery to a stream.
+    This class manages the coordinator, handling the lifecycle of the data
+    processing pipeline and graceful shutdown procedures.
     """
 
-    def __init__(self, processor: StreamProcessor) -> None:
+    def __init__(self, coordinator: Coordinator) -> None:
         """
-        Initialize the worker with a data source and processor.
+        Initialize the worker with a coordinator.
 
         Args:
-            data_source (DataSource): The data source to listen for changes
-            from.
-            processor (StreamProcessor): The processor to handle the changes.
-            state_manager (Optional[StateManager]): The state manager to
-            load/save state.
+            coordinator: The coordinator responsible for data flow orchestration
         """
-        self.processor = processor
+        self.coordinator = coordinator
         self.running = True
 
     def run(self) -> None:
         """
-        Run the worker, processing changes from the data source.
+        Run the worker, initiating the data processing pipeline.
 
-        This method starts the worker loop, connecting to the data source,
-        listening for changes, and passing them to the processor. The loop
-        continues until the worker is stopped.
+        This method starts the coordinator and continuously processes data until
+        the worker is stopped.
 
         Raises:
             ProcessingError: If processing fails.
         """
         try:
-            logger.info("Worker Started")
-            self.processor.start()
+            logger.info("Worker started")
+            self.coordinator.start()
 
             while self.running:
-                self.processor.process_next()
+                self.coordinator.process_next()
 
         except Exception as e:
             logger.error(f"Worker error: {e}")
             raise ProcessingError(f"Processing failed: {str(e)}")
         finally:
-            self.processor.stop()
+            self.coordinator.stop()
             logger.info("Worker stopped gracefully")
 
     def stop(self) -> None:
@@ -63,3 +57,4 @@ class Worker:
         self.running = False
         time.sleep(2)
         exit(0)
+
