@@ -14,9 +14,9 @@ done
 
 echo "Dropping and recreating users table..."
 docker exec -i "$CONTAINER_NAME" mysql -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" <<EOF
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS simpleusers;
 
-CREATE TABLE users (
+CREATE TABLE simpleusers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
@@ -25,7 +25,7 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-INSERT INTO users (name, email, status) VALUES
+INSERT INTO simpleusers (name, email, status) VALUES
     ('Alice Smith', 'alice.smith@example.com', 'active'),
     ('Bob Johnson', 'bob.johnson@example.com', 'inactive'),
     ('Charlie Brown', 'charlie.brown@example.com', 'pending'),
@@ -41,3 +41,4 @@ else
     echo "Error: Database initialization failed."
     exit 1
 fi
+
