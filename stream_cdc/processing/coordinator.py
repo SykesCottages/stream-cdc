@@ -276,4 +276,3 @@ class Coordinator:
             logger.info("Coordinator stopped")
         except Exception as e:
             logger.error(f"Error stopping coordinator: {e}")
-

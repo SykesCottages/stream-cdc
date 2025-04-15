@@ -36,7 +36,6 @@ def main() -> None:
     datasource_type = os.getenv("DS_TYPE", "mysql").lower()
     state_manager_type = os.getenv("STATE_MANAGER_TYPE", "dynamodb").lower()
 
-
     # Create the components needed by the coordinator
     stream = StreamFactory.create(stream_type)
     datasource = DataSourceFactory.create(datasource_type)
@@ -68,4 +67,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

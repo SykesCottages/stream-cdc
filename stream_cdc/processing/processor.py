@@ -11,4 +11,3 @@ class DefaultEventProcessor:
     def process(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single event by serializing it."""
         return self.serializer.serialize(event)
-
