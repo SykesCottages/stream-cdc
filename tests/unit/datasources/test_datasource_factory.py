@@ -60,9 +60,7 @@ class TestDataSourceFactory:
         DataSourceFactory.register_datasource("mock", self.MockDataSource)
 
         # Create an instance with some arguments
-        datasource = DataSourceFactory.create(
-            "mock", host="localhost", port=3306
-        )
+        datasource = DataSourceFactory.create("mock", host="localhost", port=3306)
 
         # Check type and passed arguments
         assert isinstance(datasource, self.MockDataSource)
@@ -86,9 +84,7 @@ class TestDataSourceFactory:
             DataSourceFactory.create("unsupported")
 
         # Error message should contain the unsupported type and available types
-        assert "Unsupported data source type: unsupported" in str(
-            exc_info.value
-        )
+        assert "Unsupported data source type: unsupported" in str(exc_info.value)
         assert "Supported types: []" in str(exc_info.value)
 
     def test_create_unsupported_datasource_with_registered_types(self):

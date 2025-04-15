@@ -58,9 +58,7 @@ class Coordinator:
     def _load_state(self) -> None:
         """Load the last saved state and configure the datasource."""
         if not self.state_manager:
-            logger.warning(
-                "No state manager configured, skipping state loading"
-            )
+            logger.warning("No state manager configured, skipping state loading")
             return
 
         try:
@@ -79,9 +77,7 @@ class Coordinator:
             )
 
             if not position:
-                logger.info(
-                    "No saved state found, starting from default position"
-                )
+                logger.info("No saved state found, starting from default position")
                 return
 
             logger.info(f"Retrieved state from storage: {position}")
@@ -109,9 +105,7 @@ class Coordinator:
             if "mysql" in class_name:
                 return "mysql"
 
-        logger.warning(
-            "Could not determine data source type for state management"
-        )
+        logger.warning("Could not determine data source type for state management")
         return None
 
     def _get_datasource_source(self) -> Optional[str]:
@@ -239,8 +233,7 @@ class Coordinator:
                 and self._last_saved_position == position
             ):
                 logger.debug(
-                    f"Position {position} already saved, skipping "
-                    "duplicate save"
+                    f"Position {position} already saved, skipping duplicate save"
                 )
                 return
 
@@ -253,8 +246,7 @@ class Coordinator:
             self._last_saved_position = position
 
             logger.debug(
-                f"Updated state for {datasource_type}:"
-                f"{datasource_source} to {position}"
+                f"Updated state for {datasource_type}:{datasource_source} to {position}"
             )
         except Exception as e:
             logger.error(f"Failed to save state: {e}")

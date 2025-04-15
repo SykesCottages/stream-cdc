@@ -186,9 +186,7 @@ class TestSQS:
         assert mock_sqs_client.send_message_batch.call_count == 2
 
         # First batch should have 10 messages
-        first_batch = mock_sqs_client.send_message_batch.call_args_list[0][1][
-            "Entries"
-        ]
+        first_batch = mock_sqs_client.send_message_batch.call_args_list[0][1]["Entries"]
         assert len(first_batch) == 10
 
         # Second batch should have 5 messages

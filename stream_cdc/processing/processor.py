@@ -39,9 +39,7 @@ class StreamProcessor:
 
     def _load_state(self) -> None:
         if not self.state_manager:
-            logger.warning(
-                "No state manager configured, skipping state loading"
-            )
+            logger.warning("No state manager configured, skipping state loading")
             return
 
         try:
@@ -55,9 +53,7 @@ class StreamProcessor:
                 return
 
             # Directly query DynamoDB for debugging @ToDo should remove this.
-            logger.debug(
-                f"Retrieving state for {datasource_type}:{datasource_source}"
-            )
+            logger.debug(f"Retrieving state for {datasource_type}:{datasource_source}")
             position = self.state_manager.read(
                 datasource_type=datasource_type,
                 datasource_source=datasource_source,
@@ -66,9 +62,7 @@ class StreamProcessor:
             logger.debug(f"Retrieved raw position data: {position}")
 
             if not position:
-                logger.info(
-                    "No saved state found, starting from default position"
-                )
+                logger.info("No saved state found, starting from default position")
                 return
 
             logger.info(f"Retrieved state from storage: {position}")
@@ -99,9 +93,7 @@ class StreamProcessor:
             if "mysql" in class_name:
                 return "mysql"
 
-        logger.warning(
-            "Could not determine data source type for state management"
-        )
+        logger.warning("Could not determine data source type for state management")
         return None
 
     def _get_datasource_source(self) -> Optional[str]:

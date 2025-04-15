@@ -16,9 +16,7 @@ class DataSourceFactory:
     REGISTRY: ClassVar[Dict[str, Type[DataSource]]] = {}
 
     @classmethod
-    def register_datasource(
-        cls, name: str, datasource_class: Type[DataSource]
-    ) -> None:
+    def register_datasource(cls, name: str, datasource_class: Type[DataSource]) -> None:
         """
         Register a data source implementation.
 

@@ -72,10 +72,7 @@ class TestDynamodbStateManager:
                                     call_kwargs["aws_secret_access_key"]
                                     == "test-secret-key"
                                 )
-                                assert (
-                                    call_kwargs["config"]
-                                    == mock_config_instance
-                                )
+                                assert call_kwargs["config"] == mock_config_instance
 
     def test_create_client_without_tcp_keepalive(self):
         """Test client creation without TCP keep-alive for older botocore"""
@@ -111,23 +108,16 @@ class TestDynamodbStateManager:
                                 # Verify boto3 client was called with the config
                                 mock_boto_client.assert_called_once()
                                 call_kwargs = mock_boto_client.call_args.kwargs
-                                assert (
-                                    call_kwargs["config"]
-                                    == mock_config_instance
-                                )
+                                assert call_kwargs["config"] == mock_config_instance
 
     def test_ensure_table_exists_when_table_exists(self):
         """Test _ensure_table_exists when table already exists"""
         # Mock the client's describe_table to succeed (table exists)
         mock_client = MagicMock()
-        mock_client.describe_table.return_value = {
-            "Table": {"TableName": "test-table"}
-        }
+        mock_client.describe_table.return_value = {"Table": {"TableName": "test-table"}}
 
         with patch.dict(os.environ, self.env_vars):
-            with patch.object(
-                Dynamodb, "_create_client", return_value=mock_client
-            ):
+            with patch.object(Dynamodb, "_create_client", return_value=mock_client):
                 # Create instance - no need to store the reference
                 Dynamodb()
 
@@ -151,9 +141,7 @@ class TestDynamodbStateManager:
         )
 
         with patch.dict(os.environ, self.env_vars):
-            with patch.object(
-                Dynamodb, "_create_client", return_value=mock_client
-            ):
+            with patch.object(Dynamodb, "_create_client", return_value=mock_client):
                 # Should raise ConfigurationError - we don't need the instance
                 with pytest.raises(ConfigurationError) as exc_info:
                     Dynamodb()
@@ -170,14 +158,10 @@ class TestDynamodbStateManager:
         """Test store method successfully stores data"""
         # Mock table exists
         mock_client = MagicMock()
-        mock_client.describe_table.return_value = {
-            "Table": {"TableName": "test-table"}
-        }
+        mock_client.describe_table.return_value = {"Table": {"TableName": "test-table"}}
 
         with patch.dict(os.environ, self.env_vars):
-            with patch.object(
-                Dynamodb, "_create_client", return_value=mock_client
-            ):
+            with patch.object(Dynamodb, "_create_client", return_value=mock_client):
                 # Create instance
                 manager = Dynamodb()
 
@@ -205,9 +189,7 @@ class TestDynamodbStateManager:
         """Test read method successfully retrieves data"""
         # Mock table exists
         mock_client = MagicMock()
-        mock_client.describe_table.return_value = {
-            "Table": {"TableName": "test-table"}
-        }
+        mock_client.describe_table.return_value = {"Table": {"TableName": "test-table"}}
 
         # Mock get_item response
         mock_client.get_item.return_value = {
@@ -220,9 +202,7 @@ class TestDynamodbStateManager:
         }
 
         with patch.dict(os.environ, self.env_vars):
-            with patch.object(
-                Dynamodb, "_create_client", return_value=mock_client
-            ):
+            with patch.object(Dynamodb, "_create_client", return_value=mock_client):
                 # Create instance
                 manager = Dynamodb()
 
