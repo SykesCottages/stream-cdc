@@ -1,61 +1,76 @@
-from typing import List, Dict, Any, Optional, Iterator
+from typing import Iterator, List, Dict, Any, Optional, Protocol
 import time
 from stream_cdc.utils.logger import logger
 from stream_cdc.streams.base import Stream
-from stream_cdc.utils.serializer import Serializer
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.state.base import StateManager
 from stream_cdc.utils.exceptions import ProcessingError
 
 
-class Coordinator:
+class EventProcessor(Protocol):
+    """Protocol defining an event processor component."""
+
+    def process(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a single event and return the processed result."""
+        ...
+
+
+class FlushPolicy(Protocol):
+    """Protocol defining a component that determines when to flush the buffer."""
+
+    def should_flush(
+        self, buffer: List[Dict[str, Any]], last_flush_time: float
+    ) -> bool:
+        """Determine if the buffer should be flushed."""
+        ...
+
+    def reset(self) -> None:
+        """Reset the flush policy state after a flush."""
+        ...
+
+
+class BatchSizeAndTimePolicy:
     """
-    Coordinator orchestrates the flow between DataSource, StateManager, and Stream.
-
-    This class is responsible for coordinating the data flow from the data source
-    to the stream, while managing state persistence.
+    Flush policy based on batch size and elapsed time.
     """
 
-    def __init__(
-        self,
-        datasource: DataSource,
-        state_manager: StateManager,
-        stream: Stream,
-        batch_size: int = 10,
-        flush_interval: float = 5.0,
-    ) -> None:
-        """
-        Initialize the Coordinator.
-
-        Args:
-            datasource: The data source to retrieve events from
-            state_manager: The state manager to load/save position state
-            stream: The stream to send processed events to
-            batch_size: Maximum number of events to batch before sending
-            flush_interval: Maximum time (seconds) to wait before forcing a flush
-        """
-        self.datasource = datasource
-        self.state_manager = state_manager
-        self.stream = stream
-        self.serializer = Serializer()
+    def __init__(self, batch_size: int, flush_interval: float):
         self.batch_size = batch_size
         self.flush_interval = flush_interval
-        self.buffer: List[Dict[str, Any]] = []
-        self.last_flush_time = time.time()
-        self._current_iterator: Optional[Iterator[Dict[str, Any]]] = None
 
-    def start(self) -> None:
-        """Start the coordinator by loading state and connecting to datasource."""
-        try:
-            self._load_state()
-            self.datasource.connect()
-            logger.info("Connected to data source")
-        except Exception as e:
-            error_msg = f"Failed to start coordinator: {str(e)}"
-            logger.error(error_msg)
-            raise ProcessingError(error_msg)
+    def should_flush(
+        self, buffer: List[Dict[str, Any]], last_flush_time: float
+    ) -> bool:
+        """
+        Determine if buffer should be flushed based on size or elapsed time.
 
-    def _load_state(self) -> None:
+        Returns:
+            bool: True if buffer should be flushed, False otherwise
+        """
+        if not buffer:
+            return False
+
+        batch_size_reached = len(buffer) >= self.batch_size
+        time_interval_elapsed = time.time() - last_flush_time >= self.flush_interval
+
+        return batch_size_reached or time_interval_elapsed
+
+    def reset(self) -> None:
+        """Reset the policy state (no state to reset in this implementation)."""
+        pass
+
+
+class StateCheckpointManager:
+    """
+    Handles the checkpointing of state from a datasource to a state manager.
+    """
+
+    def __init__(self, datasource: DataSource, state_manager: StateManager):
+        self.datasource = datasource
+        self.state_manager = state_manager
+        self._last_saved_position: Optional[Dict[str, str]] = None
+
+    def load_state(self) -> None:
         """Load the last saved state and configure the datasource."""
         if not self.state_manager:
             logger.warning("No state manager configured, skipping state loading")
@@ -82,7 +97,7 @@ class Coordinator:
 
             logger.info(f"Retrieved state from storage: {position}")
 
-            if not isinstance(position, dict) or len(position) == 0:
+            if not isinstance(position, dict) or not position:
                 logger.warning(f"Invalid position format retrieved: {position}")
                 return
 
@@ -91,120 +106,7 @@ class Coordinator:
         except Exception as e:
             logger.error(f"Error loading state: {e}")
 
-    def _get_datasource_type(self) -> Optional[str]:
-        """Determine the type of datasource for state management."""
-        if hasattr(self.datasource, "SCHEMA_VERSION"):
-            schema_version = getattr(self.datasource, "SCHEMA_VERSION", "")
-            if schema_version.startswith("mysql-"):
-                return "mysql"
-
-        if hasattr(self.datasource, "__class__") and hasattr(
-            self.datasource.__class__, "__name__"
-        ):
-            class_name = self.datasource.__class__.__name__.lower()
-            if "mysql" in class_name:
-                return "mysql"
-
-        logger.warning("Could not determine data source type for state management")
-        return None
-
-    def _get_datasource_source(self) -> Optional[str]:
-        """Determine the source identifier for state management."""
-        if hasattr(self.datasource, "host"):
-            host = getattr(self.datasource, "host")
-            if host:
-                return host
-
-        if hasattr(self.datasource, "connection_settings"):
-            conn_settings = getattr(self.datasource, "connection_settings", {})
-            if isinstance(conn_settings, dict) and "host" in conn_settings:
-                return conn_settings["host"]
-
-        logger.warning(
-            "Could not determine data source identifier for state management"
-        )
-        return None
-
-    def process_next(self) -> bool:
-        """
-        Process the next batch of events from the datasource.
-
-        Returns:
-            bool: True if events were processed, False otherwise
-        """
-        try:
-            if self._current_iterator is None:
-                self._current_iterator = self.datasource.listen()
-
-            start_time = time.time()
-            events_processed = 0
-
-            # Process events until batch size or time interval is reached
-            while (
-                events_processed < self.batch_size
-                and time.time() - start_time < self.flush_interval
-            ):
-                try:
-                    event = next(self._current_iterator)
-                    self._process_event(event)
-                    events_processed += 1
-                except StopIteration:
-                    self._current_iterator = None
-                    if events_processed == 0:
-                        return False
-                    break
-
-            # Check if we should flush based on buffer size or time
-            if self.buffer and (
-                len(self.buffer) >= self.batch_size
-                or time.time() - self.last_flush_time >= self.flush_interval
-            ):
-                self._flush_to_stream()
-
-            return events_processed > 0
-
-        except Exception as e:
-            error_msg = f"Error processing events: {str(e)}"
-            logger.error(error_msg)
-            raise ProcessingError(error_msg)
-
-    def _process_event(self, event: Dict[str, Any]) -> None:
-        """Process a single event from the datasource."""
-        if "metadata" not in event:
-            error_msg = "Message missing metadata"
-            logger.error(error_msg)
-            raise ProcessingError(error_msg)
-
-        serialized_event: Dict[str, Any] = self.serializer.serialize(event)
-        self.buffer.append(serialized_event)
-        logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
-
-        if (
-            len(self.buffer) >= self.batch_size
-            or time.time() - self.last_flush_time >= self.flush_interval
-        ):
-            self._flush_to_stream()
-
-    def _flush_to_stream(self) -> None:
-        """Send buffered events to the stream and update state."""
-        if not self.buffer:
-            return
-
-        messages = self.buffer
-        logger.debug(f"Prepared {len(messages)} messages for sending")
-
-        try:
-            self.stream.send(messages)
-            self._save_state()
-
-            self.buffer.clear()
-            self.last_flush_time = time.time()
-        except Exception as e:
-            error_msg = f"Failed to flush messages: {str(e)}"
-            logger.error(error_msg)
-            raise ProcessingError(error_msg)
-
-    def _save_state(self) -> None:
+    def save_state(self) -> None:
         """Save the current position state from the datasource."""
         if not self.state_manager:
             return
@@ -212,7 +114,7 @@ class Coordinator:
         try:
             position = self.datasource.get_position()
 
-            if not position or not isinstance(position, dict) or len(position) == 0:
+            if not position or not isinstance(position, dict) or not position:
                 logger.debug("No valid position available from datasource")
                 return
 
@@ -225,10 +127,7 @@ class Coordinator:
                 )
                 return
 
-            if (
-                hasattr(self, "_last_saved_position")
-                and self._last_saved_position == position
-            ):
+            if self._last_saved_position == position:
                 logger.debug(
                     f"Position {position} already saved, skipping duplicate save"
                 )
@@ -247,6 +146,132 @@ class Coordinator:
             )
         except Exception as e:
             logger.error(f"Failed to save state: {e}")
+
+
+class Coordinator:
+    """
+    Coordinator orchestrates the flow between DataSource, StateManager, and Stream.
+
+    This class is responsible for coordinating the data flow from the data source
+    to the stream, while managing state persistence.
+    """
+
+    def __init__(
+        self,
+        datasource: DataSource,
+        state_manager: StateManager,
+        stream: Stream,
+        event_processor: EventProcessor,
+        flush_policy: FlushPolicy,
+    ) -> None:
+        """
+        Initialize the Coordinator.
+
+        Args:
+            datasource: The data source to retrieve events from
+            state_manager: The state manager to load/save position state
+            stream: The stream to send processed events to
+            event_processor: Component that processes events before buffering
+            flush_policy: Component that determines when to flush the buffer
+        """
+        self.datasource = datasource
+        self.stream = stream
+        self.event_processor = event_processor
+        self.flush_policy = flush_policy
+        self.state_checkpoint_manager = StateCheckpointManager(
+            datasource, state_manager
+        )
+
+        self.buffer: List[Dict[str, Any]] = []
+        self.last_flush_time = time.time()
+        self._current_iterator: Optional[Iterator[Dict[str, Any]]] = None
+
+    def start(self) -> None:
+        """Start the coordinator by loading state and connecting to datasource."""
+        try:
+            self.state_checkpoint_manager.load_state()
+            self.datasource.connect()
+            logger.info("Connected to data source")
+        except Exception as e:
+            error_msg = f"Failed to start coordinator: {str(e)}"
+            logger.error(error_msg)
+            raise ProcessingError(error_msg)
+
+    def process_next(self) -> bool:
+        """
+        Process the next batch of events from the datasource.
+
+        This method handles the core processing loop and flushes the buffer
+        when the flush policy determines it's necessary.
+
+        Returns:
+            bool: True if events were processed, False otherwise
+        """
+        try:
+            # Initialize our iterator if needed
+            if self._current_iterator is None:
+                self._current_iterator = self.datasource.listen()
+
+            # Check if we need to flush before processing new events
+            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
+                self._flush_to_stream()
+
+            # Process available events
+            events_processed = 0
+            should_continue = True
+
+            while should_continue:
+                try:
+                    event = next(self._current_iterator)
+                    self._process_event(event)
+                    events_processed += 1
+
+                    # Check if we should stop processing and flush
+                    should_continue = not self.flush_policy.should_flush(
+                        self.buffer, self.last_flush_time
+                    )
+                except StopIteration:
+                    self._current_iterator = None
+                    if events_processed == 0:
+                        return False
+                    break
+
+            # Final flush check after processing
+            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
+                self._flush_to_stream()
+
+            return events_processed > 0
+
+        except Exception as e:
+            error_msg = f"Error processing events: {str(e)}"
+            logger.error(error_msg)
+            raise ProcessingError(error_msg)
+
+    def _process_event(self, event: Dict[str, Any]) -> None:
+        """Process a single event through the event processor and buffer it."""
+        processed_event = self.event_processor.process(event)
+        self.buffer.append(processed_event)
+        logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
+
+    def _flush_to_stream(self) -> None:
+        """Send buffered events to the stream and update state."""
+        if not self.buffer:
+            return
+
+        messages = self.buffer
+        logger.debug(f"Flushing {len(messages)} messages to stream")
+
+        try:
+            self.stream.send(messages)
+            self.state_checkpoint_manager.save_state()
+
+            self.buffer.clear()
+            self.last_flush_time = time.time()
+            self.flush_policy.reset()
+        except Exception as e:
+            error_msg = f"Failed to flush messages: {str(e)}"
+            logger.error(error_msg)
+            raise ProcessingError(error_msg)
 
     def stop(self) -> None:
         """Stop the coordinator and clean up resources."""
