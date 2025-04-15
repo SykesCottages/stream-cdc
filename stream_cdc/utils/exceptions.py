@@ -1,57 +1,58 @@
-class ConfigurationError(Exception):
-    """
-    Exception raised when there is an issue with the configuration.
-
-    This exception is raised when required configuration parameters are missing,
-    have invalid values, or when there is a conflict in the configuration.
-    """
+class StreamCDCError(Exception):
+    """Base exception for all Stream CDC related errors."""
 
     pass
 
 
-class StreamError(Exception):
-    """
-    Exception raised when there is an issue with a stream operation.
-
-    This exception is raised when a stream operation (such as sending a message)
-    fails due to connection issues, message size limitations, or other stream-related
-    problems.
-    """
+class ConfigurationError(StreamCDCError):
+    """Raised when there is an issue with configuration settings."""
 
     pass
 
 
-class DataSourceError(Exception):
-    """
-    Exception raised when there is an issue with a data source.
-
-    This exception is raised when a data source operation (such as connecting,
-    querying, or reading data) fails due to connection issues, invalid credentials,
-    or other data source-related problems.
-    """
+class UnsupportedTypeError(StreamCDCError):
+    """Raised when an unsupported type is requested from a factory."""
 
     pass
 
 
-class ProcessingError(Exception):
-    """
-    Exception raised when there is an issue with data processing.
-
-    This exception is raised when data processing operations fail due to
-    invalid data formats, transformation errors, or other processing-related
-    issues.
-    """
+class DataSourceError(StreamCDCError):
+    """Raised when there is an issue with a data source operation."""
 
     pass
 
 
-class UnsupportedTypeError(Exception):
-    """
-    Exception raised when an unsupported type is requested.
+class ConnectionError(StreamCDCError):
+    """Raised when there is an issue connecting to a resource."""
 
-    This exception is raised when the application attempts to create an instance
-    of a type that is not registered or supported, such as an unknown stream or
-    data source type.
-    """
+    pass
+
+
+class ReceivingError(StreamCDCError):
+    """Raised when there is an issue receiving data from a source."""
+
+    pass
+
+
+class StreamError(StreamCDCError):
+    """Raised when there is an issue with a stream operation."""
+
+    pass
+
+
+class StateError(StreamCDCError):
+    """Raised when there is an issue with state management."""
+
+    pass
+
+
+class ProcessingError(StreamCDCError):
+    """Raised when there is an issue with data processing."""
+
+    pass
+
+
+class SerializationError(StreamCDCError):
+    """Raised when there is an issue with data serialization."""
 
     pass
