@@ -1,5 +1,4 @@
 from typing import Any, Dict
-import json
 import copy
 from stream_cdc.utils.logger import logger
 
@@ -19,10 +18,11 @@ class Serializer:
         Returns:
             Dict: The serialized data as a JSON-compatible structure.
         """
-        # Make a copy so we don't modify the original
-        processed_data = self._make_json_compatible(copy.deepcopy(data))
+        try:
+            processed_data = self._make_json_compatible(copy.deepcopy(data))
+        except Exception as e:
+            logger.debug(f"Serialization exception: {e}, converting entire object to string")
 
-        # At this point, processed_data should be fully JSON-serializable
         return processed_data
 
     def _make_json_compatible(self, obj: Any) -> Any:
