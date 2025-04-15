@@ -36,6 +36,12 @@ class TestDataSourceFactory:
         def set_position(self):
             pass
 
+        def get_source_type(self):
+            return "mock"
+
+        def get_source_id(self):
+            return "mock-source"
+
     def test_register_datasource(self):
         """Test registering a data source implementation."""
         # Register a mock data source

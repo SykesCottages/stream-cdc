@@ -62,10 +62,10 @@ class Coordinator:
             return
 
         try:
-            datasource_type = self._get_datasource_type()
-            datasource_source = self._get_datasource_source()
+            datasource_type = self.datasource.get_source_type()
+            datasource_id = self.datasource.get_source_id()
 
-            if not datasource_type or not datasource_source:
+            if not datasource_type or not datasource_id:
                 logger.warning(
                     "Unable to determine data source type or source identifier"
                 )
@@ -73,7 +73,7 @@ class Coordinator:
 
             position = self.state_manager.read(
                 datasource_type=datasource_type,
-                datasource_source=datasource_source,
+                datasource_source=datasource_id,
             )
 
             if not position:
@@ -195,7 +195,7 @@ class Coordinator:
 
         try:
             self.stream.send(messages)
-            self._save_state(messages)
+            self._save_state()
 
             self.buffer.clear()
             self.last_flush_time = time.time()
@@ -204,30 +204,27 @@ class Coordinator:
             logger.error(error_msg)
             raise ProcessingError(error_msg)
 
-    def _save_state(self, messages: List[Dict[str, Any]]) -> None:
-        """Save the position state after processing messages."""
-        if not self.state_manager or not messages:
+    def _save_state(self) -> None:
+        """Save the current position state from the datasource."""
+        if not self.state_manager:
             return
 
         try:
-            last_message = messages[-1]
-            if "metadata" not in last_message:
+            position = self.datasource.get_position()
+
+            if not position or not isinstance(position, dict) or len(position) == 0:
+                logger.debug("No valid position available from datasource")
                 return
 
-            metadata = last_message["metadata"]
-            datasource_type = metadata.get("datasource_type", "unknown")
-            datasource_source = metadata.get("source", "unknown")
+            datasource_type = self.datasource.get_source_type()
+            datasource_id = self.datasource.get_source_id()
 
-            if "position" not in metadata or not metadata["position"]:
+            if not datasource_type or not datasource_id:
+                logger.warning(
+                    "Unable to determine data source type or source identifier"
+                )
                 return
 
-            position = (
-                {"gtid": metadata["position"]}
-                if isinstance(metadata["position"], str)
-                else metadata["position"]
-            )
-
-            # Avoid saving the same position repeatedly
             if (
                 hasattr(self, "_last_saved_position")
                 and self._last_saved_position == position
@@ -239,14 +236,14 @@ class Coordinator:
 
             self.state_manager.store(
                 datasource_type=datasource_type,
-                datasource_source=datasource_source,
+                datasource_source=datasource_id,
                 state_position=position,
             )
 
             self._last_saved_position = position
 
             logger.debug(
-                f"Updated state for {datasource_type}:{datasource_source} to {position}"
+                f"Updated state for {datasource_type}:{datasource_id} to {position}"
             )
         except Exception as e:
             logger.error(f"Failed to save state: {e}")

@@ -76,3 +76,23 @@ class DataSource(ABC):
             position (Dict[str, str]): The position information.
         """
         pass
+
+    @abstractmethod
+    def get_source_type(self) -> str:
+        """
+        Get the type identifier for this datasource.
+
+        Returns:
+            str: A string identifier for the type of this datasource.
+        """
+        pass
+
+    @abstractmethod
+    def get_source_id(self) -> str:
+        """
+        Get the unique identifier for this datasource instance.
+
+        Returns:
+            str: A string uniquely identifying this datasource instance.
+        """
+        pass

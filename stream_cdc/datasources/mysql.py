@@ -403,3 +403,11 @@ class MySQLDataSource(DataSource):
         else:
             logger.warning("No valid GTID position found in the provided position data")
             return
+
+    def get_source_type(self) -> str:
+        return "mysql"
+
+    def get_source_id(self) -> str:
+        if not self.host:
+            raise DataSourceError("No host configured")
+        return self.host
