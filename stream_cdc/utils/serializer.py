@@ -56,7 +56,8 @@ class Serializer:
 #         try:
 #             processed_data = self._make_json_compatible(copy.deepcopy(data))
 #         except Exception as e:
-#             logger.debug(f"Serialization exception: {e}, converting entire object to string")
+#             logger.debug(f"Serialization exception: {e}, converting entire "
+#                           "object to string")
 #
 #         return processed_data
 #
