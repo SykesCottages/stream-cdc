@@ -144,18 +144,23 @@ class SQS(Stream):
         for idx, msg in enumerate(batch):
             try:
                 message_body = json.dumps(msg)
-                #  SQS size has playload size limit of 256KB
-                if len(message_body.encode("utf-8")) > 256 * 1024:
-                    logger.error(f"Message size exceeds SQS limit of 256KB: {msg}")
-                    raise StreamError("Message size exceeds SQS limit of 256KB")
-
-                entry = {"Id": str(idx), "MessageBody": message_body}
-                entries.append(entry)
             except Exception as e:
-                logger.error(f"Failed to convert message to JSON: {msg}")
-                raise StreamError(f"Failed to convert message to JSON: {str(e)}")
+                logger.error(f"Failed to convert message to JSON: {msg} --- {e}")
+                continue
+                #  SQS size has playload size limit of 256KB
+            if len(message_body.encode("utf-8")) > 256 * 1024:
+                logger.debug(f"Message size exceeds SQS limit of 256KB: {msg}")
+                message_body = self._handle_large_messages(message_body)
+
+            entry = {"Id": str(idx), "MessageBody": message_body}
+            entries.append(entry)
 
         return entries
+
+    def _handle_large_messages(self, message: str) -> str:
+        message = json.dumps({"redacted_to_s3": "not implemented yet"})
+        logger.info("Dumping message to s3")
+        return message
 
     def _send_batch_to_sqs(self, entries: List[Dict]) -> None:
         """
