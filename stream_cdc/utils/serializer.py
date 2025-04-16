@@ -1,6 +1,5 @@
-from typing import Any, Dict
+from typing import Any
 import json
-import copy
 from stream_cdc.utils.logger import logger
 
 

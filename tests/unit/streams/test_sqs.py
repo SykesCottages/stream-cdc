@@ -234,7 +234,9 @@ class TestSQS:
             sqs_instance.send(messages)
             # Verify the error was logged properly
             mock_logger.error.assert_called_once()
-            assert "Failed to convert message to JSON" in mock_logger.error.call_args[0][0]
+            assert (
+                "Failed to convert message to JSON" in mock_logger.error.call_args[0][0]
+            )
 
         # Verify an empty batch was sent or no batch was sent
         if mock_sqs_client.send_message_batch.called:
