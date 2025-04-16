@@ -1,5 +1,9 @@
-from typing import Protocol, Dict, Any
+from typing import Protocol, Dict, Any, List
+
 from stream_cdc.utils.serializer import Serializer
+from stream_cdc.filters.base import FilterLike
+from stream_cdc.filters.factory import FilterFactory
+from stream_cdc.utils.logger import logger
 
 
 class EventProcessor(Protocol):
@@ -18,4 +22,14 @@ class DefaultEventProcessor:
 
     def process(self, event: dict) -> dict:
         """Process a single event by serializing it."""
-        return self.serializer.serialize(event)
+
+        logger.debug(f"start processing event: {event}")
+        # Add any filters here in the order they should be applied.
+        filters: List[FilterLike] = []
+
+        serealized_event = self.serializer.serialize(event)
+
+        chain = FilterFactory.create_filter_chain(filters)
+        result = chain.apply(serealized_event)
+
+        return result

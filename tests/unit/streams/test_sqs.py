@@ -195,17 +195,27 @@ class TestSQS:
         ]
         assert len(second_batch) == 5
 
-    def test_send_with_message_too_large(self, sqs_instance):
+    def test_send_with_message_too_large(self, sqs_instance, mock_sqs_client):
         """Test sending a message that exceeds SQS size limit."""
         # Create a message that will exceed 256KB when serialized
         large_message = {"data": "x" * 300 * 1024}  # 300KB of data
 
-        with pytest.raises(StreamError) as exc_info:
+        # Mock logger to verify log message
+        with patch("stream_cdc.streams.sqs.logger") as mock_logger:
             sqs_instance.send([large_message])
+            # Verify that the appropriate log message was created
+            mock_logger.info.assert_called_with("Dumping message to s3")
 
-        assert "Message size exceeds SQS limit of 256KB" in str(exc_info.value)
+        # Verify the message was sent with the redacted content
+        mock_sqs_client.send_message_batch.assert_called_once()
+        # Extract the actual messages sent
+        call_args = mock_sqs_client.send_message_batch.call_args[1]
+        assert "Entries" in call_args
+        # Verify content of redacted message
+        sent_message_body = json.loads(call_args["Entries"][0]["MessageBody"])
+        assert "redacted_to_s3" in sent_message_body
 
-    def test_prepare_sqs_entries_json_error(self, sqs_instance):
+    def test_prepare_sqs_entries_json_error(self, sqs_instance, mock_sqs_client):
         """Test handling error when a message can't be converted to JSON."""
 
         # Create a message that can't be JSON serialized
@@ -215,10 +225,24 @@ class TestSQS:
 
         messages = [{"object": UnserializableObject()}]
 
-        with pytest.raises(StreamError) as exc_info:
-            sqs_instance.send(messages)
+        # Reset the mock to clear previous calls
+        mock_sqs_client.reset_mock()
 
-        assert "Failed to convert message to JSON" in str(exc_info.value)
+        # Mock logger to verify log message
+        with patch("stream_cdc.streams.sqs.logger") as mock_logger:
+            # The method continues after logging the error
+            sqs_instance.send(messages)
+            # Verify the error was logged properly
+            mock_logger.error.assert_called_once()
+            assert "Failed to convert message to JSON" in mock_logger.error.call_args[0][0]
+
+        # Verify an empty batch was sent or no batch was sent
+        if mock_sqs_client.send_message_batch.called:
+            # Check if an empty batch was sent
+            call_args = mock_sqs_client.send_message_batch.call_args[1]
+            assert "Entries" in call_args
+            # Verify the entries list is empty - no messages were sent
+            assert len(call_args["Entries"]) == 0
 
     def test_send_with_failed_messages(self, sqs_instance, mock_sqs_client):
         """Test handling failed messages from SQS."""
