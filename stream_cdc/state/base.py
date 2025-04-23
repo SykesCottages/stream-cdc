@@ -1,19 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from stream_cdc.position.position import Position
 
 
 class StateManager(ABC):
     @abstractmethod
     def store(
-        self,
-        datasource_type: str,
-        datasource_source: str,
-        state_position: Dict[str, str],
+        self, datasource_type: str, datasource_source: str, state_position: Position
     ) -> bool:
         pass
 
     @abstractmethod
-    def read(
-        self, datasource_type: str, datasource_source: str
-    ) -> Optional[Dict[str, str]]:
+    def read(self, datasource_type: str, datasource_source: str) -> Position:
         pass
