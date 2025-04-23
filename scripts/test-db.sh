@@ -11,10 +11,10 @@ DB_PASSWORD="password"
 DB_NAME="test"
 
 # Test control - Set to true/false to enable/disable specific test components
-SETUP_DATABASE=false              # Create tables and initial data
-RUN_BASIC_UPDATES=false           # Run basic update tests (status changes, etc.)
-RUN_BATCH_OPERATIONS=false        # Run batch operations
-RUN_TRANSACTIONS=false            # Run transaction-based operations
+SETUP_DATABASE=true              # Create tables and initial data
+RUN_BASIC_UPDATES=true           # Run basic update tests (status changes, etc.)
+RUN_BATCH_OPERATIONS=true        # Run batch operations
+RUN_TRANSACTIONS=true            # Run transaction-based operations
 RUN_LARGE_DATA_TESTS=true         # Run tests with large data (>256KB)
 INCLUDE_HUGE_DATA=false           # Include very large data (>1MB)
 

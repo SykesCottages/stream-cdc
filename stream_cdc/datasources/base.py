@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Dict, Any
 
+from stream_cdc.position.position import Position
+
 
 class DataSource(ABC):
     """
@@ -52,7 +54,7 @@ class DataSource(ABC):
         pass
 
     @abstractmethod
-    def get_position(self) -> Dict[str, str]:
+    def get_position(self) -> Position:
         """
         Get the current position of the data source.
 
@@ -65,7 +67,7 @@ class DataSource(ABC):
         pass
 
     @abstractmethod
-    def set_position(self, position: Dict[str, str]) -> None:
+    def set_position(self, position: Position) -> None:
         """
         Set the starting position for streaming.
 

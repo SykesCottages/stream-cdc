@@ -8,6 +8,7 @@ from botocore.config import Config
 import botocore
 import packaging.version
 from stream_cdc.utils.exceptions import ConfigurationError
+from stream_cdc.position.position import Position
 
 
 class Dynamodb(StateManager):
@@ -73,11 +74,11 @@ class Dynamodb(StateManager):
         self,
         datasource_type: str,
         datasource_source: str,
-        state_position: Dict[str, str],
+        state_position: Position
     ) -> bool:
         try:
             position_attributes = {}
-            for key, value in state_position.items():
+            for key, value in state_position.to_dict.items():
                 position_attributes[key] = {"S": value}
 
             item = {
@@ -99,7 +100,7 @@ class Dynamodb(StateManager):
 
     def read(
         self, datasource_type: str, datasource_source: str
-    ) -> Optional[Dict[str, str]]:
+        ) -> Optional[Position]:
         try:
             response = self.client.get_item(
                 TableName=self.table_name,

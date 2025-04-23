@@ -53,3 +53,5 @@ build/
 secrets.yml
 configmap.yml
 
+dolt.py
+test.py

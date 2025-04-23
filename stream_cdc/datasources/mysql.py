@@ -1,6 +1,5 @@
 from typing import Generator, Any, Dict, Optional, Union
 import os
-import time
 import pymysql
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent, QueryEvent
@@ -13,9 +12,40 @@ from pymysqlreplication.row_event import (
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.utils.logger import logger
 from stream_cdc.utils.exceptions import DataSourceError, ConfigurationError
+from stream_cdc.position.position import Position
+
+
+class GTIDPosition:
+    """Position implementation for MySQL GTID-based positioning."""
+
+    def __init__(self, gtid: Optional[str] = None):
+        self.gtid = gtid
+
+    def to_dict(self) -> Dict[str, str]:
+        if not self.gtid:
+            return {}
+        return {"gtid": self.gtid}
+
+    def from_dict(self, position_data: Dict[str, str]) -> None:
+        if not position_data:
+            self.gtid = None
+            return
+
+        if "gtid" not in position_data:
+            raise ValueError("Invalid position data: missing gtid field")
+
+        self.gtid = position_data["gtid"]
+
+    def is_valid(self) -> bool:
+        return self.gtid is not None and len(self.gtid) > 0
+
+    def __str__(self) -> str:
+        return f"GTID: {self.gtid}" if self.gtid else "No position"
 
 
 class MySQLSettingsValidator:
+    """Validates MySQL server settings required for CDC operation."""
+
     def __init__(
         self,
         host: Union[str, None],
@@ -109,7 +139,7 @@ class MySQLSettingsValidator:
 
 
 class MySQLDataSource(DataSource):
-    SCHEMA_VERSION = "mysql-31-03-2025"
+    """MySQL CDC data source that streams changes from MySQL binlog."""
 
     def __init__(
         self,
@@ -135,15 +165,14 @@ class MySQLDataSource(DataSource):
         self.server_id = server_id
         self.binlog_client = BinLogStreamReader
         self.client = None
-        self.current_gtid = None
-        self.last_seen_event_gtid = None
 
-        # For tracking transaction state
+        # Use GTIDPosition object instead of raw string
+        self.position = GTIDPosition()
+        self.current_transaction_gtid = None
+
         self.transaction_complete = False
-
-        # For monitoring stream health
         self.last_event_time = 0
-        self.event_timeout = 30  # Seconds before reconnecting due to inactivity
+        self.event_timeout = 30
 
     def _validate_settings(self) -> None:
         try:
@@ -158,16 +187,7 @@ class MySQLDataSource(DataSource):
             logger.error(f"MySQL settings validation failed: {e}")
             raise
 
-    def _create_event_schema(self, metadata: dict, spec: dict):
-        return {
-            "version": self.SCHEMA_VERSION,
-            "metadata": metadata,
-            "spec": spec,
-        }
-
-    def _create_binlog_client(
-        self, auto_position: Optional[str] = None
-    ) -> BinLogStreamReader:
+    def _create_binlog_client(self) -> BinLogStreamReader:
         connection_settings = {
             "host": self.host,
             "user": self.user,
@@ -189,9 +209,10 @@ class MySQLDataSource(DataSource):
             ],
         }
 
-        if auto_position:
-            logger.debug(f"Setting auto_position to: {auto_position}")
-            client_args["auto_position"] = auto_position
+        # Only set auto_position if we have a valid GTID
+        if self.position and self.position.is_valid():
+            logger.debug(f"Setting auto_position to: {self.position.gtid}")
+            client_args["auto_position"] = self.position.gtid
 
         return self.binlog_client(**client_args)
 
@@ -201,33 +222,6 @@ class MySQLDataSource(DataSource):
         self._validate_settings()
 
         try:
-            if not self.current_gtid:
-                logger.info("No stored position, connecting from current position")
-                self.client = self._create_binlog_client()
-                logger.info("Connected to MySQL binlog stream")
-                return
-
-            logger.info(f"Attempting to resume from GTID: {self.current_gtid}")
-            try:
-                # Create a proper GTID set for MySQL
-                gtid_set = (
-                    self.current_gtid.split(":")[0]
-                    + ":1-"
-                    + self.current_gtid.split(":")[1]
-                )
-                logger.info(f"Using GTID set for auto_position: {gtid_set}")
-
-                self.client = self._create_binlog_client(auto_position=gtid_set)
-                logger.info(f"Successfully connected using GTID set: {gtid_set}")
-                return
-            except Exception as e:
-                logger.error(f"Failed to resume from GTID {self.current_gtid}: {e}")
-                import traceback
-
-                logger.error(f"Exception details: {traceback.format_exc()}")
-
-            # Fall back to connecting without position
-            logger.info("Connecting without position specification")
             self.client = self._create_binlog_client()
             logger.info("Connected to MySQL binlog stream")
         except Exception as e:
@@ -244,9 +238,8 @@ class MySQLDataSource(DataSource):
             return "Delete"
         return type(event).__name__
 
-    def _handle_query_event(self, event) -> None:
+    def _process_query_event(self, event) -> None:
         try:
-            # Check if query is bytes and decode if needed
             query = event.query
             if isinstance(query, bytes):
                 query = query.decode("utf-8")
@@ -256,116 +249,71 @@ class MySQLDataSource(DataSource):
 
             if query == "COMMIT":
                 self.transaction_complete = True
-                logger.debug(f"Transaction {self.last_seen_event_gtid} COMMITTED")
+                logger.debug(f"Transaction {self.current_transaction_gtid} COMMITTED")
+
+                # Update the position with the committed transaction GTID
+                if self.current_transaction_gtid:
+                    self.position.gtid = self.current_transaction_gtid
+                    logger.debug(f"Updated position to {self.position}")
         except Exception as e:
             logger.warning(f"Failed to process query: {e}")
-
-    def _handle_gtid_event(self, event) -> None:
-        old_gtid = self.current_gtid
-        self.current_gtid = event.gtid
-        self.last_seen_event_gtid = event.gtid
-        self.transaction_complete = False
-
-        # First GTID event
-        if not old_gtid:
-            logger.debug(f"Initial GTID set: {self.current_gtid}")
-            return
-
-        # Parse and compare transaction numbers if available
-        try:
-            old_txn = int(old_gtid.split(":")[1])
-            new_txn = int(event.gtid.split(":")[1])
-
-            if new_txn < old_txn:
-                logger.warning(f"GTID went backward: {old_gtid} -> {event.gtid}")
-            elif new_txn > old_txn + 1:
-                logger.warning(
-                    f"GTID skipped: {old_gtid} -> {event.gtid}, "
-                    f"missing {new_txn - old_txn - 1} transactions"
-                )
-            else:
-                logger.debug(f"Updated current GTID: {self.current_gtid}")
-        except (IndexError, ValueError):
-            logger.debug(f"Updated current GTID to: {self.current_gtid}")
-
-    def _process_row_event(self, event) -> Generator[Dict[str, Any], None, None]:
-        if not self.last_seen_event_gtid:
-            logger.warning("Received row event before any GTID event")
-            return
-
-        event_type = self._get_event_type(event)
-        transaction_status = "COMPLETE" if self.transaction_complete else "IN_PROGRESS"
-
-        for row in event.rows:
-            metadata = {
-                "datasource_type": "mysql",
-                "source": self.host,
-                "timestamp": event.timestamp,
-                "position": self.last_seen_event_gtid,
-                "transaction_status": transaction_status,
-            }
-
-            spec = {
-                "database": event.schema,
-                "table": event.table,
-                "event_type": event_type,
-                "row": row,
-                "gtid": self.last_seen_event_gtid,
-            }
-
-            output = self._create_event_schema(metadata, spec)
-            yield output
-
-    def _check_reconnect_needed(self) -> bool:
-        if not self.last_event_time:
-            return False
-
-        current_time = time.time()
-        if current_time - self.last_event_time > self.event_timeout:
-            logger.warning(
-                f"No events received for {self.event_timeout} seconds, reconnecting"
-            )
-            return True
-
-        return False
 
     def listen(self) -> Generator[Dict[str, Any], None, None]:
         if not self.client:
             raise DataSourceError("Data source not connected")
 
-        # Check if reconnection is needed due to timeout
-        if self._check_reconnect_needed():
-            self.disconnect()
-            self.connect()
-
         try:
-            if self.current_gtid:
-                logger.debug(f"Listening from position: {self.current_gtid}")
-
-            # Update last event time
-            self.last_event_time = time.time()
-
             for event in self.client:
-                self.last_event_time = time.time()
-
-                # Handle GTID events - update our position tracking
+                # Track GTID events
                 if isinstance(event, GtidEvent):
-                    self._handle_gtid_event(event)
+                    self.current_transaction_gtid = event.gtid
+                    self.transaction_complete = False
+                    logger.debug(
+                        f"New transaction GTID: {self.current_transaction_gtid} - {event.dump()}"
+                    )
                     continue
 
-                # Handle QUERY events - track transaction boundaries
+                # Process COMMIT events
                 if isinstance(event, QueryEvent):
-                    self._handle_query_event(event)
+                    self._process_query_event(event)
                     continue
 
-                # Handle ROW events - yield data to consumers
-                for row_event in self._process_row_event(event):
-                    yield row_event
+                # Skip events without rows
+                if not hasattr(event, "rows") or not event.rows:
+                    continue
+
+                # Process row events
+                formatted_events = self._format_row_events(event)
+                for formatted_event in formatted_events:
+                    yield formatted_event
 
         except Exception as e:
-            error_msg = f"Error while listening to MySQL binlog: {str(e)}"
-            logger.error(error_msg)
-            raise DataSourceError(error_msg)
+            logger.error(f"Error processing binlog: {str(e)}")
+            raise DataSourceError(f"Error processing binlog: {str(e)}")
+
+    def _format_row_events(self, event) -> Generator[Dict[str, Any], None, None]:
+        if not self.current_transaction_gtid:
+            logger.warning("Processing row event without GTID context")
+            return
+
+        event_type = self._get_event_type(event)
+        logger.debug(
+            f"Processing {event_type} event GTID: {self.current_transaction_gtid}"
+        )
+
+        for row in event.rows:
+            yield self._create_event_dict(event, event_type, row)
+
+    def _create_event_dict(self, event, event_type: str, row) -> Dict[str, Any]:
+        result = {
+            "event_type": event_type,
+            "gtid": self.current_transaction_gtid,
+            "database": event.schema,
+            "table": event.table,
+            "content": row
+        }
+
+        return result
 
     def disconnect(self) -> None:
         if not self.client:
@@ -379,30 +327,22 @@ class MySQLDataSource(DataSource):
         finally:
             self.client = None
 
-    def get_position(self) -> Dict[str, str]:
-        if self.current_gtid is None:
-            return {}
+    def get_position(self) -> Optional[Position]:
+        return self.position
 
-        return {"gtid": self.current_gtid}
-
-    def set_position(self, position: Dict[str, str]) -> None:
-        if not position:
+    def set_position(self, position_data: Position) -> None:
+        if not position_data:
             logger.warning("No position data provided")
             return
 
-        # Check for gtid key first, then try last_position
-        if "gtid" in position:
-            self.current_gtid = position["gtid"]
-            logger.info(f"Set starting GTID position to {self.current_gtid}")
-        elif "last_position" in position:
-            self.current_gtid = position["last_position"]
-            logger.info(
-                f"Set starting GTID position to {self.current_gtid} "
-                "(from last_position)"
-            )
+        if isinstance(position_data, dict):
+            self.position.from_dict(position_data)
+        elif isinstance(position_data, GTIDPosition):
+            self.position = position_data
         else:
-            logger.warning("No valid GTID position found in the provided position data")
-            return
+            logger.warning(f"Unexpected position type: {type(position_data)}")
+
+        logger.info(f"Position set to: {self.position}")
 
     def get_source_type(self) -> str:
         return "mysql"
@@ -411,3 +351,4 @@ class MySQLDataSource(DataSource):
         if not self.host:
             raise DataSourceError("No host configured")
         return self.host
+

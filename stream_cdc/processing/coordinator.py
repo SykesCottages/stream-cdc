@@ -256,7 +256,7 @@ class Coordinator:
 
         try:
             self.stream.send(messages)
-            self.state_checkpoint_manager.save_state()
+            # self.state_checkpoint_manager.save_state()
 
             self.buffer.clear()
             self.last_flush_time = time.time()
