@@ -269,7 +269,8 @@ class MySQLDataSource(DataSource):
                     self.current_transaction_gtid = event.gtid
                     self.transaction_complete = False
                     logger.debug(
-                        f"New transaction GTID: {self.current_transaction_gtid} - {event.dump()}"
+                        f"New transaction GTID: {self.current_transaction_gtid} - "
+                        f"{event.dump()}"
                     )
                     continue
 
@@ -310,7 +311,7 @@ class MySQLDataSource(DataSource):
             "gtid": self.current_transaction_gtid,
             "database": event.schema,
             "table": event.table,
-            "content": row
+            "content": row,
         }
 
         return result
@@ -351,4 +352,3 @@ class MySQLDataSource(DataSource):
         if not self.host:
             raise DataSourceError("No host configured")
         return self.host
-

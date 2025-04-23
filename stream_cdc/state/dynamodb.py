@@ -1,6 +1,6 @@
 import os
 import boto3
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from stream_cdc.utils.logger import logger
 from botocore.exceptions import ClientError
 from stream_cdc.state.base import StateManager
@@ -71,10 +71,7 @@ class Dynamodb(StateManager):
             raise ConfigurationError(error_msg)
 
     def store(
-        self,
-        datasource_type: str,
-        datasource_source: str,
-        state_position: Position
+        self, datasource_type: str, datasource_source: str, state_position: Position
     ) -> bool:
         try:
             position_attributes = {}
@@ -98,9 +95,7 @@ class Dynamodb(StateManager):
             logger.error(f"Failed to store state: {e}")
             return False
 
-    def read(
-        self, datasource_type: str, datasource_source: str
-        ) -> Optional[Position]:
+    def read(self, datasource_type: str, datasource_source: str) -> Optional[Position]:
         try:
             response = self.client.get_item(
                 TableName=self.table_name,

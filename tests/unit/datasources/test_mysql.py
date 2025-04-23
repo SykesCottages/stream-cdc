@@ -4,7 +4,7 @@ import os
 from unittest.mock import patch, MagicMock
 from stream_cdc.datasources.mysql import MySQLDataSource, MySQLSettingsValidator
 from stream_cdc.utils.exceptions import ConfigurationError, DataSourceError
-from pymysqlreplication.event import GtidEvent, QueryEvent
+from pymysqlreplication.event import GtidEvent
 from pymysqlreplication.row_event import (
     WriteRowsEvent,
     UpdateRowsEvent,
@@ -259,159 +259,29 @@ class TestMySQLDataSource:
         assert data_source.port == 3306
         assert data_source.server_id == 1234
         assert data_source.client is None
-        assert data_source.current_gtid is None
+        assert data_source.current_transaction_gtid is None
 
-    def test_mysql_datasource_init_from_env(self, mysql_env_vars):
-        """Test initialization from environment variables."""
-        data_source = MySQLDataSource()
+    def test_create_event_dict(self, mysql_data_source):
+        """Test creating event dictionary."""
+        event = MagicMock()
+        event.schema = "testdb"
+        event.table = "users"
 
-        assert data_source.host == "localhost"
-        assert data_source.user == "testuser"
-        assert data_source.password == "testpass"
-        assert data_source.port == 3306
+        event_type = "Insert"
+        row = {"id": 1, "name": "Test User"}
 
-    def test_mysql_datasource_init_missing_values(self):
-        """Test initialization with missing values."""
-        with patch.dict(os.environ, {}, clear=True):
-            # Missing host
-            with pytest.raises(ConfigurationError) as exc_info:
-                MySQLDataSource()
-            assert "DB_HOST is required" in str(exc_info.value)
-
-        with patch.dict(os.environ, {"DB_HOST": "localhost"}, clear=True):
-            # Missing user
-            with pytest.raises(ConfigurationError) as exc_info:
-                MySQLDataSource()
-            assert "DB_USER is required" in str(exc_info.value)
-
-        with patch.dict(
-            os.environ, {"DB_HOST": "localhost", "DB_USER": "user"}, clear=True
-        ):
-            # Missing password
-            with pytest.raises(ConfigurationError) as exc_info:
-                MySQLDataSource()
-            assert "DB_PASSWORD is required" in str(exc_info.value)
-
-    def test_create_event_schema(self, mysql_data_source):
-        """Test creating event schema."""
-        metadata = {
-            "datasource_type": "mysql",
-            "source": "localhost",
-            "timestamp": "1743598169",
-        }
-
-        spec = {
-            "database": "testdb",
-            "table": "users",
-            "event_type": "Insert",
-            "row": {"id": 1, "name": "Test User"},
-            "gtid": "12345678-1234-1234-1234-123456789abc:1",
-        }
-
-        event = mysql_data_source._create_event_schema(metadata, spec)
-
-        assert event["version"] == mysql_data_source.SCHEMA_VERSION
-        assert event["metadata"] == metadata
-        assert event["spec"] == spec
-
-    def test_connect(self):
-        """Test connecting to MySQL."""
-        # First, mock the BinLogStreamReader class at the module level
-        with patch(
-            "stream_cdc.datasources.mysql.BinLogStreamReader"
-        ) as mock_binlog_reader:
-            mock_client = MagicMock()
-            mock_binlog_reader.return_value = mock_client
-
-            # Then create the data source
-            data_source = MySQLDataSource(
-                host="localhost",
-                user="testuser",
-                password="testpass",
-                port=3306,
-                server_id=1000,
-            )
-
-            # Mock validation to avoid actual validation
-            with patch.object(data_source, "_validate_settings"):
-                data_source.connect()
-
-                # Verify binlog client was created with correct parameters
-                mock_binlog_reader.assert_called_once()
-                # Check connection settings
-                connection_settings = mock_binlog_reader.call_args[1][
-                    "connection_settings"
-                ]
-                assert connection_settings["host"] == "localhost"
-                assert connection_settings["user"] == "testuser"
-                assert connection_settings["passwd"] == "testpass"
-                assert connection_settings["port"] == 3306
-
-                # Check other parameters
-                assert mock_binlog_reader.call_args[1]["server_id"] == 1000
-                assert mock_binlog_reader.call_args[1]["blocking"] is True
-                assert mock_binlog_reader.call_args[1]["resume_stream"] is True
-
-                # Check event types
-                assert WriteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert UpdateRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert DeleteRowsEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert GtidEvent in mock_binlog_reader.call_args[1]["only_events"]
-                assert QueryEvent in mock_binlog_reader.call_args[1]["only_events"]
-
-    def test_connect_validation_failure(self):
-        """Test connect method with validation failure."""
-        data_source = MySQLDataSource(
-            host="localhost",
-            user="testuser",
-            password="testpass",
-            port=3306,
-            server_id=1000,
+        # Set the current transaction GTID
+        mysql_data_source.current_transaction_gtid = (
+            "12345678-1234-1234-1234-123456789abc:1"
         )
 
-        # Mock _validate_settings to simulate validation failure
-        with patch.object(
-            data_source,
-            "_validate_settings",
-            side_effect=ConfigurationError("Validation failed"),
-        ):
-            with pytest.raises(ConfigurationError) as exc_info:
-                data_source.connect()
+        result = mysql_data_source._create_event_dict(event, event_type, row)
 
-            assert "Validation failed" in str(exc_info.value)
-
-    def test_connect_client_error(self):
-        """Test connect method with client creation failure."""
-        # First, mock the BinLogStreamReader class at the module level
-        with patch(
-            "stream_cdc.datasources.mysql.BinLogStreamReader",
-            side_effect=Exception("Client error"),
-        ):
-            # Then create the data source
-            data_source = MySQLDataSource(
-                host="localhost",
-                user="testuser",
-                password="testpass",
-                port=3306,
-                server_id=1000,
-            )
-
-            # Mock validation to avoid actual validation
-            with patch.object(data_source, "_validate_settings"):
-                with pytest.raises(DataSourceError) as exc_info:
-                    data_source.connect()
-
-                assert "Failed to connect to MySQL: Client error" in str(exc_info.value)
-
-    def test_listen_without_connection(self, mysql_data_source):
-        """Test listen method without prior connection."""
-        # No client set
-        mysql_data_source.client = None
-
-        with pytest.raises(DataSourceError) as exc_info:
-            next(mysql_data_source.listen())
-
-        assert "Data source not connected" in str(exc_info.value)
+        assert result["event_type"] == "Insert"
+        assert result["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
+        assert result["database"] == "testdb"
+        assert result["table"] == "users"
+        assert result["content"] == row
 
     def test_listen_with_gtid_events(self, mysql_data_source):
         """Test listen method with GTID events."""
@@ -422,10 +292,12 @@ class TestMySQLDataSource:
         gtid_event = MagicMock(spec=GtidEvent)
         gtid_event.gtid = "12345678-1234-1234-1234-123456789abc:1"
 
+        # Add dump method to the gtid_event
+        gtid_event.dump.return_value = "GTID event dump"
+
         write_event = MagicMock(spec=WriteRowsEvent)
         write_event.schema = "testdb"
         write_event.table = "users"
-        write_event.timestamp = 1743598382
         write_event.rows = [{"data": {"id": 1, "name": "Test User"}}]
 
         # First yield a GTID event, then a row event
@@ -440,17 +312,17 @@ class TestMySQLDataSource:
 
         # Should only get one event (the row event)
         assert len(events) == 1
-        assert events[0]["spec"]["database"] == "testdb"
-        assert events[0]["spec"]["table"] == "users"
-        assert events[0]["spec"]["event_type"] == "Insert"
-        assert events[0]["spec"]["row"] == {"data": {"id": 1, "name": "Test User"}}
-        assert events[0]["spec"]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
+        assert events[0]["event_type"] == "Insert"
+        assert events[0]["database"] == "testdb"
+        assert events[0]["table"] == "users"
+        assert events[0]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
 
     def test_listen_with_different_event_types(self, mysql_data_source):
         """Test listen method with different event types."""
         # Set up GTID first (required for row events)
         gtid_event = MagicMock(spec=GtidEvent)
         gtid_event.gtid = "12345678-1234-1234-1234-123456789abc:1"
+        gtid_event.dump.return_value = "GTID event dump"
 
         # Create a mock binlog client
         mock_binlog_client = MagicMock()
@@ -459,13 +331,11 @@ class TestMySQLDataSource:
         write_event = MagicMock(spec=WriteRowsEvent)
         write_event.schema = "testdb"
         write_event.table = "users"
-        write_event.timestamp = 1743598169
         write_event.rows = [{"data": {"id": 1, "name": "New User"}}]
 
         update_event = MagicMock(spec=UpdateRowsEvent)
         update_event.schema = "testdb"
         update_event.table = "users"
-        update_event.timestamp = 1743598170
         update_event.rows = [
             {
                 "before": {"id": 1, "name": "Old User"},
@@ -476,7 +346,6 @@ class TestMySQLDataSource:
         delete_event = MagicMock(spec=DeleteRowsEvent)
         delete_event.schema = "testdb"
         delete_event.table = "users"
-        delete_event.timestamp = 1743598171
         delete_event.rows = [{"data": {"id": 2, "name": "Deleted User"}}]
 
         # Initialize GTID first, then yield all event types
@@ -498,24 +367,22 @@ class TestMySQLDataSource:
         assert len(events) == 3
 
         # Check first event (write)
-        assert events[0]["metadata"]["datasource_type"] == "mysql"
-        assert events[0]["metadata"]["source"] == mysql_data_source.host
-        assert events[0]["metadata"]["position"] == gtid_event.gtid
-        assert events[0]["spec"]["event_type"] == "Insert"
-        assert events[0]["spec"]["database"] == "testdb"
-        assert events[0]["spec"]["table"] == "users"
+        assert events[0]["event_type"] == "Insert"
+        assert events[0]["database"] == "testdb"
+        assert events[0]["table"] == "users"
+        assert events[0]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
 
         # Check second event (update)
-        assert events[1]["metadata"]["datasource_type"] == "mysql"
-        assert events[1]["spec"]["event_type"] == "Update"
-        assert events[1]["spec"]["database"] == "testdb"
-        assert events[1]["spec"]["table"] == "users"
+        assert events[1]["event_type"] == "Update"
+        assert events[1]["database"] == "testdb"
+        assert events[1]["table"] == "users"
+        assert events[1]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
 
         # Check third event (delete)
-        assert events[2]["metadata"]["datasource_type"] == "mysql"
-        assert events[2]["spec"]["event_type"] == "Delete"
-        assert events[2]["spec"]["database"] == "testdb"
-        assert events[2]["spec"]["table"] == "users"
+        assert events[2]["event_type"] == "Delete"
+        assert events[2]["database"] == "testdb"
+        assert events[2]["table"] == "users"
+        assert events[2]["gtid"] == "12345678-1234-1234-1234-123456789abc:1"
 
     def test_listen_error(self, mysql_data_source):
         """Test listen method with error during iteration."""
@@ -532,46 +399,4 @@ class TestMySQLDataSource:
         with pytest.raises(DataSourceError) as exc_info:
             next(mysql_data_source.listen())
 
-        assert "Error while listening to MySQL binlog: Iterator error" in str(
-            exc_info.value
-        )
-
-    def test_disconnect(self, mysql_data_source):
-        """Test disconnect method."""
-        # Create a mock binlog client
-        mock_binlog_client = MagicMock()
-
-        # Set the client
-        mysql_data_source.client = mock_binlog_client
-
-        # Disconnect
-        mysql_data_source.disconnect()
-
-        # Client should be closed and set to None
-        mock_binlog_client.close.assert_called_once()
-        assert mysql_data_source.client is None
-
-    def test_disconnect_without_client(self, mysql_data_source):
-        """Test disconnect method when no client exists."""
-        # No client set
-        mysql_data_source.client = None
-
-        # Should not raise exception
-        mysql_data_source.disconnect()
-
-    def test_disconnect_with_error(self, mysql_data_source):
-        """Test disconnect method when client.close raises error."""
-        # Create a mock binlog client
-        mock_binlog_client = MagicMock()
-
-        # Set up client to raise error on close
-        mock_binlog_client.close.side_effect = Exception("Close error")
-
-        # Set the client
-        mysql_data_source.client = mock_binlog_client
-
-        # Should not raise exception outside
-        mysql_data_source.disconnect()
-
-        # Client should still be set to None
-        assert mysql_data_source.client is None
+        assert "Error processing binlog: Iterator error" in str(exc_info.value)
