@@ -75,7 +75,6 @@ class Dynamodb(StateManager):
         try:
             position_attributes = {}
             position_attributes["position"] = {"S": state_position}
-            print(f"Position attributes: {position_attributes}")
 
             item = {
                 "PK": {"S": datasource_type},

@@ -257,7 +257,6 @@ class Coordinator:
         logger.debug(f"Flushing {len(messages)} messages to stream")
 
         try:
-            logger.error(f"{self.datasource.get_current_position()}")
             self.stream.send(messages)
             self.state_checkpoint_manager.save_state()
 
