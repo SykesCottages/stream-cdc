@@ -30,10 +30,10 @@ class TestDataSourceFactory:
         def disconnect(self):
             pass
 
-        def get_position(self):
-            return {}
+        def get_current_position(self):
+            return ""
 
-        def set_position(self):
+        def set_start_position(self, position):
             pass
 
         def get_source_type(self):
