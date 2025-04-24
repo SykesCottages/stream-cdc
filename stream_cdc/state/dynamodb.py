@@ -1,6 +1,6 @@
 import os
 import boto3
-from typing import Any, Optional
+from typing import Any
 from stream_cdc.utils.logger import logger
 from botocore.exceptions import ClientError
 from stream_cdc.state.base import StateManager
@@ -8,7 +8,6 @@ from botocore.config import Config
 import botocore
 import packaging.version
 from stream_cdc.utils.exceptions import ConfigurationError
-from stream_cdc.position.position import Position
 
 
 class Dynamodb(StateManager):
@@ -71,16 +70,16 @@ class Dynamodb(StateManager):
             raise ConfigurationError(error_msg)
 
     def store(
-        self, datasource_type: str, datasource_source: str, state_position: Position
+        self, datasource_type: str, datasource_source: str, state_position: str
     ) -> bool:
         try:
             position_attributes = {}
-            for key, value in state_position.to_dict.items():
-                position_attributes[key] = {"S": value}
+            position_attributes["position"] = {"S": state_position}
+            print(f"Position attributes: {position_attributes}")
 
             item = {
-                "datasource_type": {"S": datasource_type},
-                "datasource_source": {"S": datasource_source},
+                "PK": {"S": datasource_type},
+                "SK": {"S": datasource_source},
                 **position_attributes,
             }
 
@@ -95,31 +94,30 @@ class Dynamodb(StateManager):
             logger.error(f"Failed to store state: {e}")
             return False
 
-    def read(self, datasource_type: str, datasource_source: str) -> Optional[Position]:
+    def read(self, datasource_type: str, datasource_source: str) -> str:
         try:
             response = self.client.get_item(
                 TableName=self.table_name,
                 Key={
-                    "datasource_type": {"S": datasource_type},
-                    "datasource_source": {"S": datasource_source},
+                    "PK": {"S": datasource_type},
+                    "SK": {"S": datasource_source},
                 },
             )
 
             if "Item" not in response:
                 logger.info(f"No state found for {datasource_type}:{datasource_source}")
-                return None
+                return ""
 
-            result = {}
             for key, value in response["Item"].items():
-                if key in ["datasource_type", "datasource_source"]:
+                if key in ["PK", "SK"]:
                     continue
 
                 if "S" in value:
-                    result[key] = value["S"]
+                    result = value["S"]
 
             logger.debug(f"Retrieved state: {result}")
             return result
 
         except Exception as e:
             logger.error(f"Failed to read state: {e}")
-            return None
+            return ""

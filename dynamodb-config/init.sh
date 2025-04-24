@@ -10,11 +10,11 @@ aws dynamodb create-table \
     --region us-east-1 \
     --table-name $TABLE_NAME \
     --attribute-definitions \
-        AttributeName=datasource_type,AttributeType=S \
-        AttributeName=datasource_source,AttributeType=S \
+        AttributeName=PK,AttributeType=S \
+        AttributeName=SK,AttributeType=S \
     --key-schema \
-        AttributeName=datasource_type,KeyType=HASH \
-        AttributeName=datasource_source,KeyType=RANGE \
+        AttributeName=PK,KeyType=HASH \
+        AttributeName=SK,KeyType=RANGE \
     --billing-mode PAY_PER_REQUEST
 
 echo "Waiting for table to become active..."

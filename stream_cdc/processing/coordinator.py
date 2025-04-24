@@ -61,7 +61,7 @@ class StateCheckpointManager:
     def __init__(self, datasource: DataSource, state_manager: StateManager):
         self.datasource = datasource
         self.state_manager = state_manager
-        self._last_saved_position: Optional[Dict[str, str]] = None
+        self._last_saved_position: str = ""
 
     def load_state(self) -> None:
         """Load the last saved state and configure the datasource."""
@@ -90,12 +90,13 @@ class StateCheckpointManager:
 
             logger.info(f"Retrieved state from storage: {position}")
 
-            if not isinstance(position, dict) or not position:
+            if not isinstance(position, str) or not position:
                 logger.warning(f"Invalid position format retrieved: {position}")
                 return
 
             logger.info(f"Resuming from saved position: {position}")
-            self.datasource.set_position(position)
+
+            self.datasource.set_start_position(position)
         except Exception as e:
             logger.error(f"Error loading state: {e}")
 
@@ -105,9 +106,10 @@ class StateCheckpointManager:
             return
 
         try:
-            position = self.datasource.get_position()
+            position = self.datasource.get_current_position()
+            logger.debug(f"Position: {position}")
 
-            if not position or not isinstance(position, dict) or not position:
+            if not position or not isinstance(position, str) or not position:
                 logger.debug("No valid position available from datasource")
                 return
 
@@ -255,8 +257,9 @@ class Coordinator:
         logger.debug(f"Flushing {len(messages)} messages to stream")
 
         try:
+            logger.error(f"{self.datasource.get_current_position()}")
             self.stream.send(messages)
-            # self.state_checkpoint_manager.save_state()
+            self.state_checkpoint_manager.save_state()
 
             self.buffer.clear()
             self.last_flush_time = time.time()

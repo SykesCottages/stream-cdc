@@ -39,23 +39,25 @@ class TestMySQLSettingsValidator:
         conn.cursor.return_value = conn
         return conn
 
-    @pytest.fixture
-    def mock_pymysql(self):
-        """Fixture to provide a mock pymysql module."""
-        with patch("stream_cdc.datasources.mysql.pymysql") as mock:
-            mock.connect.return_value = MagicMock()
-            yield mock
-
     def test_validator_init(self):
         """Test MySQLSettingsValidator initialization."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        assert validator.host == "localhost"
-        assert validator.user == "testuser"
-        assert validator.password == "testpass"
-        assert validator.port == 3306
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
+
+            assert validator.host == "localhost"
+            assert validator.user == "testuser"
+            assert validator.password == "testpass"
+            assert validator.port == 3306
+
+            # Verify connection attempt
+            mock_connect.assert_called_once_with(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
     def test_validator_init_missing_values(self):
         """Test initialization with missing values."""
@@ -81,140 +83,172 @@ class TestMySQLSettingsValidator:
 
     def test_get_required_settings(self):
         """Test getting required MySQL settings."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        required_settings = validator._get_required_settings()
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        assert required_settings["binlog_format"] == "ROW"
-        assert required_settings["binlog_row_metadata"] == "FULL"
-        assert required_settings["binlog_row_image"] == "FULL"
-        assert required_settings["gtid_mode"] == "ON"
-        assert required_settings["enforce_gtid_consistency"] == "ON"
+            required_settings = validator._get_required_settings()
+
+            assert required_settings["binlog_format"] == "ROW"
+            assert required_settings["binlog_row_metadata"] == "FULL"
+            assert required_settings["binlog_row_image"] == "FULL"
+            assert required_settings["gtid_mode"] == "ON"
+            assert required_settings["enforce_gtid_consistency"] == "ON"
 
     def test_fetch_actual_settings(self, mock_cursor):
         """Test fetching actual settings from MySQL."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        actual_settings = validator._fetch_actual_settings(mock_cursor)
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        assert actual_settings["binlog_format"] == "ROW"
-        assert actual_settings["binlog_row_metadata"] == "FULL"
-        assert actual_settings["binlog_row_image"] == "FULL"
-        assert actual_settings["gtid_mode"] == "ON"
-        assert actual_settings["enforce_gtid_consistency"] == "ON"
+            actual_settings = validator._fetch_actual_settings(mock_cursor)
 
-        # Verify the query was executed correctly
-        mock_cursor.execute.assert_called_once()
-        # Verify the query includes all required settings
-        query_params = mock_cursor.execute.call_args[0][1]
-        assert len(query_params) == 5
-        assert all(
-            param in query_params
-            for param in [
-                "binlog_format",
-                "binlog_row_metadata",
-                "binlog_row_image",
-                "gtid_mode",
-                "enforce_gtid_consistency",
-            ]
-        )
+            assert actual_settings["binlog_format"] == "ROW"
+            assert actual_settings["binlog_row_metadata"] == "FULL"
+            assert actual_settings["binlog_row_image"] == "FULL"
+            assert actual_settings["gtid_mode"] == "ON"
+            assert actual_settings["enforce_gtid_consistency"] == "ON"
+
+            # Verify the query was executed correctly
+            mock_cursor.execute.assert_called_once()
+            # Verify the query includes all required settings
+            query_params = mock_cursor.execute.call_args[0][1]
+            assert len(query_params) == 5
+            assert all(
+                param in query_params
+                for param in [
+                    "binlog_format",
+                    "binlog_row_metadata",
+                    "binlog_row_image",
+                    "gtid_mode",
+                    "enforce_gtid_consistency",
+                ]
+            )
 
     def test_verify_settings_success(self):
         """Test successful settings verification."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        # All settings match requirements
-        actual_settings = {
-            "binlog_format": "ROW",
-            "binlog_row_metadata": "FULL",
-            "binlog_row_image": "FULL",
-            "gtid_mode": "ON",
-            "enforce_gtid_consistency": "ON",
-        }
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        # Should not raise exception
-        validator._verify_settings(actual_settings)
+            # All settings match requirements
+            actual_settings = {
+                "binlog_format": "ROW",
+                "binlog_row_metadata": "FULL",
+                "binlog_row_image": "FULL",
+                "gtid_mode": "ON",
+                "enforce_gtid_consistency": "ON",
+            }
+
+            # Should not raise exception
+            validator._verify_settings(actual_settings)
 
     def test_verify_settings_missing_setting(self):
         """Test verification with missing setting."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        # Missing binlog_format
-        actual_settings = {
-            "binlog_row_metadata": "FULL",
-            "binlog_row_image": "FULL",
-            "gtid_mode": "ON",
-            "enforce_gtid_consistency": "ON",
-        }
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        with pytest.raises(ConfigurationError) as exc_info:
-            validator._verify_settings(actual_settings)
+            # Missing binlog_format
+            actual_settings = {
+                "binlog_row_metadata": "FULL",
+                "binlog_row_image": "FULL",
+                "gtid_mode": "ON",
+                "enforce_gtid_consistency": "ON",
+            }
 
-        assert "MySQL setting binlog_format not found" in str(exc_info.value)
+            with pytest.raises(ConfigurationError) as exc_info:
+                validator._verify_settings(actual_settings)
+
+            assert "MySQL setting binlog_format not found" in str(exc_info.value)
 
     def test_verify_settings_incorrect_value(self):
         """Test verification with incorrect setting value."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            # Prevent actual database connection
+            mock_connect.return_value = MagicMock()
 
-        # binlog_format is STATEMENT instead of ROW
-        actual_settings = {
-            "binlog_format": "STATEMENT",
-            "binlog_row_metadata": "FULL",
-            "binlog_row_image": "FULL",
-            "gtid_mode": "ON",
-            "enforce_gtid_consistency": "ON",
-        }
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        with pytest.raises(ConfigurationError) as exc_info:
-            validator._verify_settings(actual_settings)
+            # binlog_format is STATEMENT instead of ROW
+            actual_settings = {
+                "binlog_format": "STATEMENT",
+                "binlog_row_metadata": "FULL",
+                "binlog_row_image": "FULL",
+                "gtid_mode": "ON",
+                "enforce_gtid_consistency": "ON",
+            }
 
-        assert "MySQL setting binlog_format is incorrect" in str(exc_info.value)
-        assert "expected=ROW" in str(exc_info.value)
-        assert "actual=STATEMENT" in str(exc_info.value)
+            with pytest.raises(ConfigurationError) as exc_info:
+                validator._verify_settings(actual_settings)
 
-    def test_validate_success(self, mock_pymysql, mock_connection):
+            assert "MySQL setting binlog_format is incorrect" in str(exc_info.value)
+            assert "expected=ROW" in str(exc_info.value)
+            assert "actual=STATEMENT" in str(exc_info.value)
+
+    def test_validate_success(self, mock_connection):
         """Test successful validation."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
+        with patch("pymysql.connect") as mock_connect:
+            mock_connect.return_value = mock_connection
 
-        mock_pymysql.connect.return_value = mock_connection
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
 
-        # Should not raise exception
-        validator.validate()
-
-        # Verify connection was created with correct parameters
-        mock_pymysql.connect.assert_called_once_with(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
-
-        # Verify connection was closed
-        mock_connection.close.assert_called_once()
-
-    def test_validate_connection_error(self, mock_pymysql):
-        """Test validation with connection error."""
-        validator = MySQLSettingsValidator(
-            host="localhost", user="testuser", password="testpass", port=3306
-        )
-
-        # Simulate connection error
-        mock_pymysql.Error = Exception
-        mock_pymysql.connect.side_effect = mock_pymysql.Error("Connection refused")
-
-        with pytest.raises(ConfigurationError) as exc_info:
+            # Should not raise exception
             validator.validate()
 
-        assert "Failed to connect to MySQL: Connection refused" in str(exc_info.value)
+            # Verify connection was created with correct parameters
+            mock_connect.assert_called_once_with(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
+
+            # Verify connection was closed
+            mock_connection.close.assert_called_once()
+
+    def test_validate_connection_error(self):
+        """Test validation with connection error."""
+        with patch("pymysql.connect") as mock_connect:
+            # First return a valid connection for the __init__ to succeed
+            mock_conn = MagicMock()
+            mock_connect.return_value = mock_conn
+
+            # Create the validator object
+            validator = MySQLSettingsValidator(
+                host="localhost", user="testuser", password="testpass", port=3306
+            )
+
+            # Now make the cursor throw an exception when used
+            mock_cursor = MagicMock()
+            mock_conn.cursor.return_value = mock_cursor
+            mock_cursor.__enter__.side_effect = Exception("Connection refused")
+
+            # Test the validate method
+            with pytest.raises(ConfigurationError) as exc_info:
+                validator.validate()
+
+            # Verify the error message
+            assert "Failed to connect to MySQL: Connection refused" in str(
+                exc_info.value
+            )
 
 
 class TestMySQLDataSource:
@@ -235,31 +269,46 @@ class TestMySQLDataSource:
     @pytest.fixture
     def mysql_data_source(self):
         """Fixture to provide a MySQLDataSource instance."""
-        return MySQLDataSource(
-            host="localhost",
-            user="testuser",
-            password="testpass",
-            port=3306,
-            server_id=1000,
-        )
+        # Mock the pymysql.connect to prevent actual database connection
+        with patch("pymysql.connect") as mock_connect:
+            mock_connect.return_value = MagicMock()
+            # Create the data source with patched connection
+            data_source = MySQLDataSource(
+                host="localhost",
+                user="testuser",
+                password="testpass",
+                port=3306,
+                server_id=1000,
+            )
+            # Set attributes for testing
+            data_source.client = None
+            data_source.current_position = None
+            data_source.transaction_complete = False
+            data_source.last_event_time = time.time()
+
+            yield data_source
 
     def test_mysql_datasource_init(self):
         """Test MySQLDataSource initialization."""
-        data_source = MySQLDataSource(
-            host="localhost",
-            user="testuser",
-            password="testpass",
-            port=3306,
-            server_id=1234,
-        )
+        # Mock the pymysql.connect to prevent actual database connection
+        with patch("pymysql.connect") as mock_connect:
+            mock_connect.return_value = MagicMock()
 
-        assert data_source.host == "localhost"
-        assert data_source.user == "testuser"
-        assert data_source.password == "testpass"
-        assert data_source.port == 3306
-        assert data_source.server_id == 1234
-        assert data_source.client is None
-        assert data_source.current_transaction_gtid is None
+            data_source = MySQLDataSource(
+                host="localhost",
+                user="testuser",
+                password="testpass",
+                port=3306,
+                server_id=1234,
+            )
+
+            assert data_source.host == "localhost"
+            assert data_source.user == "testuser"
+            assert data_source.password == "testpass"
+            assert data_source.port == 3306
+            assert data_source.server_id == 1234
+            assert data_source.client is None
+            assert data_source.current_position is None
 
     def test_create_event_dict(self, mysql_data_source):
         """Test creating event dictionary."""
@@ -271,9 +320,7 @@ class TestMySQLDataSource:
         row = {"id": 1, "name": "Test User"}
 
         # Set the current transaction GTID
-        mysql_data_source.current_transaction_gtid = (
-            "12345678-1234-1234-1234-123456789abc:1"
-        )
+        mysql_data_source.current_position = "12345678-1234-1234-1234-123456789abc:1"
 
         result = mysql_data_source._create_event_dict(event, event_type, row)
 

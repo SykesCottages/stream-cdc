@@ -1,6 +1,7 @@
 from typing import Generator, Any, Dict, Optional, Union
 import os
 import pymysql
+from pymysql.cursors import Cursor
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent, QueryEvent
 from pymysqlreplication.row_event import (
@@ -8,39 +9,13 @@ from pymysqlreplication.row_event import (
     UpdateRowsEvent,
     WriteRowsEvent,
 )
-
+from collections import namedtuple
 from stream_cdc.datasources.base import DataSource
 from stream_cdc.utils.logger import logger
 from stream_cdc.utils.exceptions import DataSourceError, ConfigurationError
-from stream_cdc.position.position import Position
 
 
-class GTIDPosition:
-    """Position implementation for MySQL GTID-based positioning."""
-
-    def __init__(self, gtid: Optional[str] = None):
-        self.gtid = gtid
-
-    def to_dict(self) -> Dict[str, str]:
-        if not self.gtid:
-            return {}
-        return {"gtid": self.gtid}
-
-    def from_dict(self, position_data: Dict[str, str]) -> None:
-        if not position_data:
-            self.gtid = None
-            return
-
-        if "gtid" not in position_data:
-            raise ValueError("Invalid position data: missing gtid field")
-
-        self.gtid = position_data["gtid"]
-
-    def is_valid(self) -> bool:
-        return self.gtid is not None and len(self.gtid) > 0
-
-    def __str__(self) -> str:
-        return f"GTID: {self.gtid}" if self.gtid else "No position"
+ServerInfo = namedtuple("ServerInfo", ["server_uuid", "gtid_executed"])
 
 
 class MySQLSettingsValidator:
@@ -67,6 +42,18 @@ class MySQLSettingsValidator:
         self.password = password
         self.port = port
 
+        try:
+            self.conn = pymysql.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                port=self.port,
+            )
+        except Exception as e:
+            error_msg = f"Failed to connect to MySQL: {e}"
+            logger.error(error_msg)
+            raise ConfigurationError(error_msg)
+
     def _get_required_settings(self) -> Dict[str, str]:
         return {
             "binlog_format": "ROW",
@@ -76,7 +63,7 @@ class MySQLSettingsValidator:
             "enforce_gtid_consistency": "ON",
         }
 
-    def _fetch_actual_settings(self, cursor) -> Dict[str, str]:
+    def _fetch_actual_settings(self, cursor: Cursor) -> Dict[str, str]:
         required_settings = self._get_required_settings()
 
         var_query = "SHOW GLOBAL VARIABLES WHERE Variable_name IN (%s)"
@@ -113,26 +100,15 @@ class MySQLSettingsValidator:
 
     def validate(self) -> None:
         try:
-            conn = pymysql.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                port=self.port,
-            )
-
-            with conn.cursor() as cursor:
+            with self.conn.cursor() as cursor:
                 actual_settings = self._fetch_actual_settings(cursor)
                 self._verify_settings(actual_settings)
 
-            conn.close()
+            self.conn.close()
 
-        except pymysql.Error as e:
-            error_msg = f"Failed to connect to MySQL: {e}"
-            logger.error(error_msg)
-            raise ConfigurationError(error_msg)
         except Exception as e:
             if not isinstance(e, ConfigurationError):
-                error_msg = f"Failed to validate MySQL settings: {e}"
+                error_msg = f"Failed to connect to MySQL: {e}"
                 logger.error(error_msg)
                 raise ConfigurationError(error_msg)
             raise
@@ -167,12 +143,24 @@ class MySQLDataSource(DataSource):
         self.client = None
 
         # Use GTIDPosition object instead of raw string
-        self.position = GTIDPosition()
-        self.current_transaction_gtid = None
+        self.start_position = None
+        self.current_position = None
 
         self.transaction_complete = False
         self.last_event_time = 0
         self.event_timeout = 30
+
+        try:
+            self.conn = pymysql.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                port=self.port,
+            )
+        except Exception as e:
+            error_msg = f"Failed to connect to MySQL: {e}"
+            logger.error(error_msg)
+            raise ConfigurationError(error_msg)
 
     def _validate_settings(self) -> None:
         try:
@@ -210,11 +198,53 @@ class MySQLDataSource(DataSource):
         }
 
         # Only set auto_position if we have a valid GTID
-        if self.position and self.position.is_valid():
-            logger.debug(f"Setting auto_position to: {self.position.gtid}")
-            client_args["auto_position"] = self.position.gtid
+        if self.start_position not in (None, ""):
+            start_position = self._fomart_gtid(self.start_position)
+            client_args["auto_position"] = start_position
 
         return self.binlog_client(**client_args)
+
+    def _get_gtid_server_info(self, cursor: Cursor) -> ServerInfo:
+        cursor.execute("SELECT @@GLOBAL.SERVER_UUID")
+        server_uuid = cursor.fetchone()
+        if server_uuid is None:
+            raise ConfigurationError("Could not retrieve SERVER_UUID")
+        server_uuid = server_uuid[0]
+
+        cursor.execute("SELECT @@GLOBAL.GTID_EXECUTED")
+        result = cursor.fetchone()
+        if result is None:
+            raise ConfigurationError("No GTID_EXECUTED found in MySQL server")
+        gtid_executed = result[0]
+
+        return ServerInfo(server_uuid=server_uuid, gtid_executed=gtid_executed)
+
+    def _fomart_gtid(self, gtid: str) -> str:
+        """
+        Format the GTID string to match the expected format.
+        """
+
+        server_uuid = gtid.split(":")[0]
+        gtid_position = gtid.split(":")[1]
+
+        current_poistion = f"{server_uuid}:1-{gtid_position}"
+
+        logger.error(f"Formatting GTID: {gtid}")
+        with self.conn.cursor() as cursor:
+            info = self._get_gtid_server_info(cursor)
+            if info.server_uuid != server_uuid:
+                raise ConfigurationError(
+                    f"GTID server UUID {server_uuid} does not match "
+                    f"current server UUID {info.server_uuid}"
+                )
+
+            gtids = info.gtid_executed.split(",")
+            for gtid in gtids:
+                if gtid.startswith(server_uuid):
+                    gtid = current_poistion
+                    break
+
+        return gtids
 
     def connect(self) -> None:
         logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
@@ -247,14 +277,6 @@ class MySQLDataSource(DataSource):
                 logger.warning(f"Query is not a string or bytes: {type(query)}")
                 return
 
-            if query == "COMMIT":
-                self.transaction_complete = True
-                logger.debug(f"Transaction {self.current_transaction_gtid} COMMITTED")
-
-                # Update the position with the committed transaction GTID
-                if self.current_transaction_gtid:
-                    self.position.gtid = self.current_transaction_gtid
-                    logger.debug(f"Updated position to {self.position}")
         except Exception as e:
             logger.warning(f"Failed to process query: {e}")
 
@@ -266,10 +288,10 @@ class MySQLDataSource(DataSource):
             for event in self.client:
                 # Track GTID events
                 if isinstance(event, GtidEvent):
-                    self.current_transaction_gtid = event.gtid
+                    self.current_position = event.gtid
                     self.transaction_complete = False
                     logger.debug(
-                        f"New transaction GTID: {self.current_transaction_gtid} - "
+                        f"New transaction GTID: {self.current_position} - "
                         f"{event.dump()}"
                     )
                     continue
@@ -293,14 +315,12 @@ class MySQLDataSource(DataSource):
             raise DataSourceError(f"Error processing binlog: {str(e)}")
 
     def _format_row_events(self, event) -> Generator[Dict[str, Any], None, None]:
-        if not self.current_transaction_gtid:
+        if not self.current_position:
             logger.warning("Processing row event without GTID context")
             return
 
         event_type = self._get_event_type(event)
-        logger.debug(
-            f"Processing {event_type} event GTID: {self.current_transaction_gtid}"
-        )
+        logger.debug(f"Processing {event_type} event GTID: {self.current_position}")
 
         for row in event.rows:
             yield self._create_event_dict(event, event_type, row)
@@ -308,7 +328,7 @@ class MySQLDataSource(DataSource):
     def _create_event_dict(self, event, event_type: str, row) -> Dict[str, Any]:
         result = {
             "event_type": event_type,
-            "gtid": self.current_transaction_gtid,
+            "gtid": self.current_position,
             "database": event.schema,
             "table": event.table,
             "content": row,
@@ -328,22 +348,19 @@ class MySQLDataSource(DataSource):
         finally:
             self.client = None
 
-    def get_position(self) -> Optional[Position]:
-        return self.position
+    def get_current_position(self) -> str:
+        if not self.current_position:
+            logger.warning("No current position available")
+            return ""
+        return self.current_position
 
-    def set_position(self, position_data: Position) -> None:
-        if not position_data:
+    def set_start_position(self, position: str) -> None:
+        if not position:
             logger.warning("No position data provided")
             return
 
-        if isinstance(position_data, dict):
-            self.position.from_dict(position_data)
-        elif isinstance(position_data, GTIDPosition):
-            self.position = position_data
-        else:
-            logger.warning(f"Unexpected position type: {type(position_data)}")
-
-        logger.info(f"Position set to: {self.position}")
+        self.start_position = position
+        logger.info(f"Position set to: {self.start_position}")
 
     def get_source_type(self) -> str:
         return "mysql"
