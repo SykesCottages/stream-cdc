@@ -270,10 +270,15 @@ class MySQLDataSource(DataSource):
                 return
             except Exception as e:
                 error_str = str(e)
-                if "server_uuid/server_id" in error_str and retry_count < max_retries - 1:
+                if (
+                    "server_uuid/server_id" in error_str
+                    and retry_count < max_retries - 1
+                ):
                     old_server_id = self.server_id
                     # Use timestamp as part of the server_id to reduce collision chance
-                    self.server_id = random.randint(100000, 9999999) + int(time.time()) % 1000000
+                    self.server_id = (
+                        random.randint(100000, 9999999) + int(time.time()) % 1000000
+                    )
                     logger.warning(
                         f"Server ID conflict detected. Retrying with new server_id: "
                         f"{old_server_id} -> {self.server_id}"
@@ -289,7 +294,9 @@ class MySQLDataSource(DataSource):
 
                     retry_count += 1
                     # Use exponential backoff with jitter
-                    sleep_time = (backoff_factor ** retry_count) + random.uniform(0.1, 1.0)
+                    sleep_time = (backoff_factor**retry_count) + random.uniform(
+                        0.1, 1.0
+                    )
                     logger.info(f"Retrying in {sleep_time:.2f} seconds...")
                     time.sleep(sleep_time)
                 else:
@@ -409,4 +416,3 @@ class MySQLDataSource(DataSource):
         if not self.host:
             raise DataSourceError("No host configured")
         return self.host
-
