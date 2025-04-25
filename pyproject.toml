@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "amazon-sqs-extended-client>=1.0.1",
     "boto3>=1.37.20",
     "cryptography>=44.0.2",
     "mysql-connector-python>=9.2.0",

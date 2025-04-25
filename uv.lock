@@ -1,6 +1,17 @@
 version = 1
-revision = 1
 requires-python = ">=3.13"
+
+[[package]]
+name = "amazon-sqs-extended-client"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/00/eb98606fad39a59ab187854d9f22ac5f14c5233a75b0e890c4fd41345a75/amazon_sqs_extended_client-1.0.1.tar.gz", hash = "sha256:9924e758cd463866b898f56e752e9e59ce1457b195cd5f5466dc6f37141730ce", size = 14638 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/30/250e8400a111de93903740773164bc59bc201e30572d13b3d0b623d91de5/amazon_sqs_extended_client-1.0.1-py3-none-any.whl", hash = "sha256:2d349896917d92698d0a5abd3f84279791fdf7ba0fec2352427c2d9cdb3d0b1f", size = 14711 },
+]
 
 [[package]]
 name = "boto3"
@@ -28,45 +39,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5d/eb/b90ec01a82278a283db0b788f0a36201e485ceb31df762c44cddbcda2085/botocore-1.37.20.tar.gz", hash = "sha256:9295385740f9d30f9b679f76ee51f49b80ae73183d84d499c1c3f1d54d820f54", size = 13670736 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2d/5b/f96cf58c37704b907ac2f9cc94e45ba0a2aa3b2062421aa8b8614f1d78de/botocore-1.37.20-py3-none-any.whl", hash = "sha256:c34f4f25fda7c4f726adf5a948590bd6bd7892c05278d31e344b5908e7b43301", size = 13432464 },
-]
-
-[[package]]
-name = "stream-cdc"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "boto3" },
-    { name = "cryptography" },
-    { name = "mysql-connector-python" },
-    { name = "mysql-replication" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pymysql" },
-    { name = "python-dotenv" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "watchdog" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = ">=1.37.20" },
-    { name = "cryptography", specifier = ">=44.0.2" },
-    { name = "mysql-connector-python", specifier = ">=9.2.0" },
-    { name = "mysql-replication", specifier = ">=1.0.9" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.6" },
-    { name = "pymysql", specifier = ">=1.1.1" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.3.5" },
-    { name = "ruff", specifier = ">=0.11.0" },
-    { name = "watchdog", specifier = ">=6.0.0" },
 ]
 
 [[package]]
@@ -327,6 +299,47 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
+]
+
+[[package]]
+name = "stream-cdc"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "amazon-sqs-extended-client" },
+    { name = "boto3" },
+    { name = "cryptography" },
+    { name = "mysql-connector-python" },
+    { name = "mysql-replication" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pymysql" },
+    { name = "python-dotenv" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "watchdog" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "amazon-sqs-extended-client", specifier = ">=1.0.1" },
+    { name = "boto3", specifier = ">=1.37.20" },
+    { name = "cryptography", specifier = ">=44.0.2" },
+    { name = "mysql-connector-python", specifier = ">=9.2.0" },
+    { name = "mysql-replication", specifier = ">=1.0.9" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.6" },
+    { name = "pymysql", specifier = ">=1.1.1" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "ruff", specifier = ">=0.11.0" },
+    { name = "watchdog", specifier = ">=6.0.0" },
 ]
 
 [[package]]
