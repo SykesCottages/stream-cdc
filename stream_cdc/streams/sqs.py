@@ -5,7 +5,6 @@ import json
 import boto3
 import os
 from typing import List, Any, Dict, Optional
-import sqs_extended_client
 
 
 class SQS(Stream):
@@ -68,16 +67,7 @@ class SQS(Stream):
         if not self.aws_secret_access_key:
             raise ConfigurationError("AWS_SECRET_ACCESS_KEY is required")
 
-        self.bucket_name = os.getenv("S3_BUCKET_NAME")
-
-        sqs_extended_client = self._create_client()
-
-        # Only use extended client if bucket name is provided
-        logger.info(f"Using SQS extended client with bucket: {self.bucket_name}")
-        sqs_extended_client.large_payload_support = self.bucket_name
-        sqs_extended_client.use_legacy_attribute = False
-
-        self._client = sqs_extended_client
+        self._client = self._create_client()
 
         logger.debug(
             f"Setup queue: {self.queue_url} - {self.endpoint_url} - {self.region}"
