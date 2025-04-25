@@ -5,7 +5,6 @@ import json
 import boto3
 import os
 from typing import List, Any, Dict, Optional
-import sqs_extended_client
 
 
 class SQS(Stream):
