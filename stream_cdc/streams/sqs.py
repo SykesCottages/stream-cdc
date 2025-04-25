@@ -67,7 +67,6 @@ class SQS(Stream):
         if not self.aws_secret_access_key:
             raise ConfigurationError("AWS_SECRET_ACCESS_KEY is required")
 
-
         self._client = self._create_client()
 
         logger.debug(
