@@ -71,10 +71,14 @@ class SQS(Stream):
 
         self.bucket_name = bucket_name or os.getenv("S3_BUCKET_NAME")
 
+
         sqs_extended_client = self._create_client()
 
         # Only use extended client if bucket name is provided
         if self.bucket_name is not None:
+            logger.info(
+                f"Using SQS extended client with bucket: {self.bucket_name}"
+            )
             sqs_extended_client.large_payload_support = self.bucket_name
             sqs_extended_client.use_legacy_attribute = False
 
