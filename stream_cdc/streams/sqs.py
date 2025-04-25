@@ -5,7 +5,6 @@ import json
 import boto3
 import os
 from typing import List, Any, Dict, Optional
-import sqs_extended_client
 
 
 class SQS(Stream):
@@ -68,16 +67,8 @@ class SQS(Stream):
         if not self.aws_secret_access_key:
             raise ConfigurationError("AWS_SECRET_ACCESS_KEY is required")
 
-        self.bucket_name = os.getenv("S3_BUCKET_NAME")
 
-        sqs_extended_client = self._create_client()
-
-        # Only use extended client if bucket name is provided
-        logger.info(f"Using SQS extended client with bucket: {self.bucket_name}")
-        sqs_extended_client.large_payload_support = self.bucket_name
-        sqs_extended_client.use_legacy_attribute = False
-
-        self._client = sqs_extended_client
+        self._client = self._create_client()
 
         logger.debug(
             f"Setup queue: {self.queue_url} - {self.endpoint_url} - {self.region}"
@@ -157,8 +148,8 @@ class SQS(Stream):
             except Exception as e:
                 logger.error(f"Failed to convert message to JSON: {msg} --- {e}")
                 continue
-                #  SQS size has playload size limit of 150KB
-            if len(message_body.encode("utf-8")) > 150 * 1024:
+                #  SQS size has playload size limit of 50KB
+            if len(message_body.encode("utf-8")) > 50 * 1024:
                 logger.debug(f"Message size exceeds SQS limit of 256KB: {msg}")
                 message_body = self._handle_large_messages(message_body)
 
