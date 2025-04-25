@@ -147,8 +147,8 @@ class SQS(Stream):
             except Exception as e:
                 logger.error(f"Failed to convert message to JSON: {msg} --- {e}")
                 continue
-                #  SQS size has playload size limit of 150KB
-            if len(message_body.encode("utf-8")) > 150 * 1024:
+                #  SQS size has playload size limit of 50KB
+            if len(message_body.encode("utf-8")) > 50 * 1024:
                 logger.debug(f"Message size exceeds SQS limit of 256KB: {msg}")
                 message_body = self._handle_large_messages(message_body)
 
