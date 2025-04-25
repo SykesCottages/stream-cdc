@@ -26,6 +26,7 @@ class SQS(Stream):
         endpoint_url: Optional[str] = None,
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
+        bucket_name: Optional[str] = None,
     ):
         """
         Initialize the SQS stream with configuration.
@@ -41,6 +42,7 @@ class SQS(Stream):
             AWS_ACCESS_KEY_ID environment variable.
             aws_secret_access_key (Optional[str]): The AWS secret access key.
             Defaults to AWS_SECRET_ACCESS_KEY environment variable.
+            bucket_name (Optional[str]): The S3 bucket name for large message support.
 
         Raises:
             ConfigurationError: If any required configuration parameter is missing.
@@ -67,7 +69,16 @@ class SQS(Stream):
         if not self.aws_secret_access_key:
             raise ConfigurationError("AWS_SECRET_ACCESS_KEY is required")
 
-        self._client = self._create_client()
+        self.bucket_name = bucket_name or os.getenv("S3_BUCKET_NAME")
+
+        sqs_extended_client = self._create_client()
+
+        # Only use extended client if bucket name is provided
+        if self.bucket_name is not None:
+            sqs_extended_client.large_payload_support = self.bucket_name
+            sqs_extended_client.use_legacy_attribute = False
+
+        self._client = sqs_extended_client
 
         logger.debug(
             f"Setup queue: {self.queue_url} - {self.endpoint_url} - {self.region}"
