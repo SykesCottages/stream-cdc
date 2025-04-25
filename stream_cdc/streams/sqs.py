@@ -75,6 +75,7 @@ class SQS(Stream):
 
         # Only use extended client if bucket name is provided
         if self.bucket_name is not None:
+            logger.info(f"Using SQS extended client with bucket: {self.bucket_name}")
             sqs_extended_client.large_payload_support = self.bucket_name
             sqs_extended_client.use_legacy_attribute = False
 
