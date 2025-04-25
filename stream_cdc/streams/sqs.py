@@ -25,7 +25,7 @@ class SQS(Stream):
         region: Optional[str] = None,
         endpoint_url: Optional[str] = None,
         aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None
+        aws_secret_access_key: Optional[str] = None,
     ):
         """
         Initialize the SQS stream with configuration.
