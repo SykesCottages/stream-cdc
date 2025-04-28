@@ -27,7 +27,7 @@ class StreamFactory:
         cls.REGISTRY[name.lower()] = datasource_class
 
     @classmethod
-    def create(cls, stream_type: str) -> Stream:
+    def create(cls, stream_type: str, **kwargs) -> Stream:
         """
         Create a Stream implementation based on requested type.
 
@@ -53,4 +53,4 @@ class StreamFactory:
             )
 
         stream_class = cls.REGISTRY[normalized_type]
-        return stream_class()
+        return stream_class(**kwargs)
