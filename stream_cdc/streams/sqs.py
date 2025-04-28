@@ -26,6 +26,7 @@ class SQS(Stream):
         endpoint_url: Optional[str] = None,
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
+        source: Optional[str] = None,
     ):
         """
         Initialize the SQS stream with configuration.
@@ -41,10 +42,15 @@ class SQS(Stream):
             AWS_ACCESS_KEY_ID environment variable.
             aws_secret_access_key (Optional[str]): The AWS secret access key.
             Defaults to AWS_SECRET_ACCESS_KEY environment variable.
+            source (Optional[str]): The source identifier for the messages. Defaults
 
         Raises:
             ConfigurationError: If any required configuration parameter is missing.
         """
+        self.source = source or os.getenv("SOURCE")
+        if not self.source:
+            self.source = "stream_cdc"
+
         self.queue_url = queue_url or os.getenv("SQS_QUEUE_URL")
         if not self.queue_url:
             raise ConfigurationError("SQS_QUEUE_URL is required")
@@ -152,7 +158,13 @@ class SQS(Stream):
                 logger.debug(f"Message size exceeds SQS limit of 256KB: {msg}")
                 message_body = self._handle_large_messages(message_body)
 
-            entry = {"Id": str(idx), "MessageBody": message_body}
+            messageAttr = {"source": {"StringValue": self.source, "DataType": "String"}}
+
+            entry = {
+                "Id": str(idx),
+                "MessageBody": message_body,
+                "MessageAttributes": messageAttr,
+            }
             entries.append(entry)
 
         return entries

@@ -37,7 +37,8 @@ def main() -> None:
     state_manager_type = os.getenv("STATE_MANAGER_TYPE", "dynamodb").lower()
 
     # Create the components needed by the coordinator
-    stream = StreamFactory.create(stream_type)
+    stream_settings = {"source": os.getenv("DB_HOST")}
+    stream = StreamFactory.create(stream_type, **stream_settings)
     datasource = DataSourceFactory.create(datasource_type)
     state_manager = StateManagerFactory.create(state_manager_type)
     event_processor = DefaultEventProcessor()
