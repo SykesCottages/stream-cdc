@@ -1,5 +1,4 @@
 import time
-from typing import Optional
 from stream_cdc.utils.logger import logger
 from stream_cdc.processing.coordinator import Coordinator
 from stream_cdc.utils.exceptions import ProcessingError
@@ -58,7 +57,11 @@ class Worker:
                     idle_count += 1
                     if idle_count >= max_idle_count:
                         # Exponential backoff with a cap
-                        sleep_time = min(idle_sleep_time * (1.5 ** min(idle_count - max_idle_count, 10)), 5)
+                        sleep_time = min(
+                            idle_sleep_time
+                            * (1.5 ** min(idle_count - max_idle_count, 10)),
+                            5,
+                        )
                         time.sleep(sleep_time)
                 else:
                     idle_count = 0
@@ -94,4 +97,3 @@ class Worker:
         logger.info("Stop signal received")
         self._stopping = True
         self.running = False
-

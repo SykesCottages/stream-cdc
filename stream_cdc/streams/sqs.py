@@ -39,12 +39,17 @@ class SQS(Stream):
         Initialize the SQS stream with configuration.
 
         Args:
-            queue_url: The URL of the SQS queue. Defaults to SQS_QUEUE_URL environment variable.
+            queue_url: The URL of the SQS queue. Defaults to SQS_QUEUE_URL
+                environment variable.
             region: The AWS region. Defaults to AWS_REGION environment variable.
-            endpoint_url: The AWS endpoint URL. Defaults to AWS_ENDPOINT_URL environment variable.
-            aws_access_key_id: The AWS access key ID. Defaults to AWS_ACCESS_KEY_ID environment variable.
-            aws_secret_access_key: The AWS secret access key. Defaults to AWS_SECRET_ACCESS_KEY environment variable.
-            source: The source identifier for the messages. Defaults to SOURCE environment variable.
+            endpoint_url: The AWS endpoint URL. Defaults to AWS_ENDPOINT_URL environment
+                variable.
+            aws_access_key_id: The AWS access key ID. Defaults to AWS_ACCESS_KEY_ID
+                environment variable.
+            aws_secret_access_key: The AWS secret access key. Defaults to
+                AWS_SECRET_ACCESS_KEY environment variable.
+            source: The source identifier for the messages. Defaults to SOURCE
+                 environment variable.
 
         Raises:
             ConfigurationError: If any required configuration parameter is missing.
@@ -111,17 +116,16 @@ class SQS(Stream):
                         connect_timeout=3,
                         read_timeout=5,
                         retries={"max_attempts": 3},
-                        tcp_keepalive=True
+                        tcp_keepalive=True,
                     )
 
                     self._client = session.client(
-                        "sqs",
-                        endpoint_url=self.endpoint_url,
-                        config=config
+                        "sqs", endpoint_url=self.endpoint_url, config=config
                     )
 
                     logger.debug(
-                        f"Setup SQS client: {self.queue_url} - {self.endpoint_url} - {self.region}"
+                        f"Setup SQS client: {self.queue_url} - {self.endpoint_url} "
+                        f"- {self.region}"
                     )
 
         return self._client
@@ -130,7 +134,8 @@ class SQS(Stream):
         """
         Send messages to SQS, respecting SQS batch size limits.
 
-        Batches messages according to SQS's limitations (maximum of 10 messages per batch)
+        Batches messages according to SQS's limitations (maximum of 10 messages
+            per batch)
         and sends them to the configured queue.
 
         Args:
@@ -218,11 +223,10 @@ class SQS(Stream):
             message: The original large message
 
         Returns:
-            Optional[str]: JSON string of the modified message or None if processing failed
+            Optional[str]: JSON string of the modified message or None if processing
+                failed
         """
         try:
-            # Create a simplified version of the message
-            # In a real implementation, this would store the message in S3 and return a reference
             simplified_message = {
                 "original_size_exceeded": True,
                 "redacted_to_s3": "not implemented yet",
@@ -274,27 +278,31 @@ class SQS(Stream):
                 # Log each failure with its specific error reason
                 for failed_msg in response["Failed"]:
                     logger.error(
-                        f"Message {failed_msg['Id']} failed: {failed_msg.get('Message', 'Unknown error')}"
+                        f"Message {failed_msg['Id']} failed: {
+                            failed_msg.get('Message', 'Unknown error')
+                        }"
                     )
 
                 # Determine if we should retry these messages
-                retriable_errors = ["InternalError", "ServiceUnavailable", "ThrottlingException"]
+                retriable_errors = [
+                    "InternalError",
+                    "ServiceUnavailable",
+                    "ThrottlingException",
+                ]
                 should_retry = any(
-                    failed_msg.get("SenderFault", True) is False or
-                    failed_msg.get("Code") in retriable_errors
+                    failed_msg.get("SenderFault", True) is False
+                    or failed_msg.get("Code") in retriable_errors
                     for failed_msg in response["Failed"]
                 )
 
-                error_msg = f"Failed to send {failed_count} messages to SQS. IDs: {failed_ids}"
+                error_msg = (
+                    f"Failed to send {failed_count} messages to SQS. IDs: {failed_ids}"
+                )
                 logger.error(error_msg)
 
                 if should_retry:
-                    # In a production environment, you might implement retry logic here
-                    # or send to a dead letter queue
                     logger.warning("Some messages may be retriable")
 
-                # Return failure info but don't raise exception to avoid stopping the entire process
-                # for a partial failure, unless no messages were successful
                 if failed_count == len(entries):
                     raise StreamError(error_msg)
 
@@ -305,4 +313,3 @@ class SQS(Stream):
         except Exception as e:
             logger.error(f"SQS send_message_batch failed: {str(e)}")
             raise StreamError(f"Failed to send messages to SQS: {str(e)}")
-

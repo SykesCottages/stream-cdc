@@ -228,8 +228,9 @@ class Coordinator:
             bool: True if events were processed, False otherwise
         """
         if not self._is_started or self._is_stopped:
-            logger.warning("Cannot process events - coordinator not started or "
-                "already stopped")
+            logger.warning(
+                "Cannot process events - coordinator not started or already stopped"
+            )
             return False
 
         try:
@@ -239,7 +240,6 @@ class Coordinator:
             # Process available events up to batch size limit
             events_processed = 0
             max_batch_size = self.flush_policy.batch_size
-            batch_start_time = time.time()
 
             # Pre-allocate the batch
             current_batch = []
@@ -317,14 +317,14 @@ class Coordinator:
                     logger.debug(f"Flushing remaining {len(self.buffer)} messages")
                     self._flush_to_stream()
 
-                if hasattr(self.stream, 'close') and callable(self.stream.close):
+                if hasattr(self.stream, "close") and callable(self.stream.close):
                     self.stream.close()
 
-                if (hasattr(self.datasource, 'disconnect') and
-                    callable(self.datasource.disconnect)):
+                if hasattr(self.datasource, "disconnect") and callable(
+                    self.datasource.disconnect
+                ):
                     self.datasource.disconnect()
 
                 logger.info("Coordinator stopped")
             except Exception as e:
                 logger.error(f"Error stopping coordinator: {e}")
-

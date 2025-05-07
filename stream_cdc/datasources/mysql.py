@@ -389,7 +389,7 @@ class MySQLDataSource(DataSource):
                     continue
 
                 # Skip events without rows
-                if not hasattr(event, 'rows') or not event.rows:
+                if not hasattr(event, "rows") or not event.rows:
                     continue
 
                 # Process row events
@@ -468,4 +468,3 @@ class MySQLDataSource(DataSource):
         if not self.host:
             raise DataSourceError("No host configured")
         return self.host
-
