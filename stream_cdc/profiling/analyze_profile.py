@@ -4,9 +4,8 @@ import glob
 import argparse
 import pstats
 import matplotlib.pyplot as plt
-import pandas as pd
 import re
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Optional
 
 
 def parse_profiling_log(log_file: str) -> Dict[str, Dict[str, float]]:
@@ -25,7 +24,7 @@ def parse_profiling_log(log_file: str) -> Dict[str, Dict[str, float]]:
         r"min=([\d\.]+)s, max=([\d\.]+)s"
     )
 
-    with open(log_file, 'r') as f:
+    with open(log_file, "r") as f:
         for line in f:
             match = section_pattern.search(line)
             if match:
@@ -36,17 +35,17 @@ def parse_profiling_log(log_file: str) -> Dict[str, Dict[str, float]]:
                 max_time = float(match.group(5))
 
                 metrics[section] = {
-                    'count': count,
-                    'avg': avg,
-                    'min': min_time,
-                    'max': max_time
+                    "count": count,
+                    "avg": avg,
+                    "min": min_time,
+                    "max": max_time,
                 }
 
     return metrics
 
 
 def analyze_profile_stats(
-    profile_file: str
+    profile_file: str,
 ) -> Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]:
     """
     Analyze a profile statistics file.
@@ -61,10 +60,10 @@ def analyze_profile_stats(
     p = pstats.Stats(profile_file)
 
     # Extract cumulative time stats
-    p.sort_stats('cumtime')
+    p.sort_stats("cumtime")
     time_stats = []
     for func, (cc, nc, tt, ct, callers) in dict(p.stats).items():
-        if 'stream_cdc' in func[0]:  # Only include app functions
+        if "stream_cdc" in func[0]:  # Only include app functions
             time_stats.append((f"{func[2]} ({func[0]})", ct))
 
     # Sort by cumulative time and get top functions
@@ -72,10 +71,10 @@ def analyze_profile_stats(
     time_stats = time_stats[:20]  # Get top 20
 
     # Extract call count stats
-    p.sort_stats('calls')
+    p.sort_stats("calls")
     call_stats = []
     for func, (cc, nc, tt, ct, callers) in dict(p.stats).items():
-        if 'stream_cdc' in func[0]:  # Only include app functions
+        if "stream_cdc" in func[0]:  # Only include app functions
             call_stats.append((f"{func[2]} ({func[0]})", nc))
 
     # Sort by call count and get top functions
@@ -86,8 +85,7 @@ def analyze_profile_stats(
 
 
 def plot_section_metrics(
-    metrics: Dict[str, Dict[str, float]],
-    output_file: Optional[str] = None
+    metrics: Dict[str, Dict[str, float]], output_file: Optional[str] = None
 ) -> None:
     """
     Plot section metrics as bar charts.
@@ -98,15 +96,13 @@ def plot_section_metrics(
     """
     # Prepare data
     sections = list(metrics.keys())
-    avg_times = [metrics[s]['avg'] for s in sections]
-    max_times = [metrics[s]['max'] for s in sections]
-    counts = [metrics[s]['count'] for s in sections]
+    avg_times = [metrics[s]["avg"] for s in sections]
+    max_times = [metrics[s]["max"] for s in sections]
+    counts = [metrics[s]["count"] for s in sections]
 
     # Sort by average time
     sorted_indices = sorted(
-        range(len(avg_times)),
-        key=lambda i: avg_times[i],
-        reverse=True
+        range(len(avg_times)), key=lambda i: avg_times[i], reverse=True
     )
     sections = [sections[i] for i in sorted_indices]
     avg_times = [avg_times[i] for i in sorted_indices]
@@ -125,34 +121,34 @@ def plot_section_metrics(
 
     # Plot average and max times
     x = range(len(sections))
-    ax1.barh(x, avg_times, label='Average Time (s)', color='b', alpha=0.6)
-    ax1.barh(x, max_times, label='Max Time (s)', color='r', alpha=0.4)
+    ax1.barh(x, avg_times, label="Average Time (s)", color="b", alpha=0.6)
+    ax1.barh(x, max_times, label="Max Time (s)", color="r", alpha=0.4)
     ax1.set_yticks(x)
-    ax1.set_yticklabels([s.split('.')[-1] for s in sections])
-    ax1.set_xlabel('Time (seconds)')
-    ax1.set_title('Average and Maximum Execution Time by Section')
+    ax1.set_yticklabels([s.split(".")[-1] for s in sections])
+    ax1.set_xlabel("Time (seconds)")
+    ax1.set_title("Average and Maximum Execution Time by Section")
     ax1.legend()
 
     # Add component names as annotations
     for i, section in enumerate(sections):
-        component = section.split('.')[0]
+        component = section.split(".")[0]
         ax1.annotate(
             component,
             xy=(0, i),
             xytext=(-5, 0),
             textcoords="offset points",
-            va='center',
-            ha='right',
+            va="center",
+            ha="right",
             fontsize=8,
-            color='gray'
+            color="gray",
         )
 
     # Plot call counts
-    ax2.barh(x, counts, color='g', alpha=0.6)
+    ax2.barh(x, counts, color="g", alpha=0.6)
     ax2.set_yticks(x)
-    ax2.set_yticklabels([s.split('.')[-1] for s in sections])
-    ax2.set_xlabel('Call Count')
-    ax2.set_title('Number of Calls by Section')
+    ax2.set_yticklabels([s.split(".")[-1] for s in sections])
+    ax2.set_xlabel("Call Count")
+    ax2.set_title("Number of Calls by Section")
 
     plt.tight_layout()
 
@@ -166,7 +162,7 @@ def plot_section_metrics(
 def plot_profile_stats(
     time_stats: List[Tuple[str, float]],
     call_stats: List[Tuple[str, float]],
-    output_file: Optional[str] = None
+    output_file: Optional[str] = None,
 ) -> None:
     """
     Plot profile statistics as bar charts.
@@ -184,22 +180,22 @@ def plot_profile_stats(
     cum_times = [t[1] for t in time_stats]
 
     y_pos = range(len(func_names))
-    ax1.barh(y_pos, cum_times, align='center', alpha=0.7)
+    ax1.barh(y_pos, cum_times, align="center", alpha=0.7)
     ax1.set_yticks(y_pos)
     ax1.set_yticklabels(func_names)
-    ax1.set_xlabel('Cumulative Time (seconds)')
-    ax1.set_title('Top Functions by Cumulative Time')
+    ax1.set_xlabel("Cumulative Time (seconds)")
+    ax1.set_title("Top Functions by Cumulative Time")
 
     # Plot call counts
     call_func_names = [t[0].split()[0] for t in call_stats]
     call_counts = [t[1] for t in call_stats]
 
     y_pos_calls = range(len(call_func_names))
-    ax2.barh(y_pos_calls, call_counts, align='center', alpha=0.7)
+    ax2.barh(y_pos_calls, call_counts, align="center", alpha=0.7)
     ax2.set_yticks(y_pos_calls)
     ax2.set_yticklabels(call_func_names)
-    ax2.set_xlabel('Call Count')
-    ax2.set_title('Top Functions by Call Count')
+    ax2.set_xlabel("Call Count")
+    ax2.set_title("Top Functions by Call Count")
 
     plt.tight_layout()
 
@@ -211,8 +207,7 @@ def plot_profile_stats(
 
 
 def generate_bottleneck_report(
-    log_metrics: Dict[str, Dict[str, float]],
-    time_stats: List[Tuple[str, float]]
+    log_metrics: Dict[str, Dict[str, float]], time_stats: List[Tuple[str, float]]
 ) -> str:
     """
     Generate a report identifying bottlenecks.
@@ -229,15 +224,13 @@ def generate_bottleneck_report(
     # Identify slow methods
     report += "### Slowest Methods\n\n"
     sorted_sections = sorted(
-        log_metrics.items(),
-        key=lambda x: x[1]['avg'],
-        reverse=True
+        log_metrics.items(), key=lambda x: x[1]["avg"], reverse=True
     )
 
     for i, (section, metrics) in enumerate(sorted_sections[:5]):
-        component, method = section.split('.', 1) if '.' in section else (section, '')
+        component, method = section.split(".", 1) if "." in section else (section, "")
         report += (
-            f"{i+1}. **{component}.{method}**\n"
+            f"{i + 1}. **{component}.{method}**\n"
             f"   - Average time: {metrics['avg']:.6f}s\n"
             f"   - Maximum time: {metrics['max']:.6f}s\n"
             f"   - Call count: {metrics['count']}\n\n"
@@ -247,23 +240,18 @@ def generate_bottleneck_report(
     report += "### Highest Cumulative Time\n\n"
     for i, (func, time) in enumerate(time_stats[:5]):
         simple_name = func.split()[0]
-        report += (
-            f"{i+1}. **{simple_name}**\n"
-            f"   - Cumulative time: {time:.6f}s\n\n"
-        )
+        report += f"{i + 1}. **{simple_name}**\n   - Cumulative time: {time:.6f}s\n\n"
 
     # Identify frequently called functions
     report += "### Most Frequently Called Methods\n\n"
     sorted_by_calls = sorted(
-        log_metrics.items(),
-        key=lambda x: x[1]['count'],
-        reverse=True
+        log_metrics.items(), key=lambda x: x[1]["count"], reverse=True
     )
 
     for i, (section, metrics) in enumerate(sorted_by_calls[:5]):
-        component, method = section.split('.', 1) if '.' in section else (section, '')
+        component, method = section.split(".", 1) if "." in section else (section, "")
         report += (
-            f"{i+1}. **{component}.{method}**\n"
+            f"{i + 1}. **{component}.{method}**\n"
             f"   - Call count: {metrics['count']}\n"
             f"   - Average time: {metrics['avg']:.6f}s\n"
             f"   - Total estimated time: {metrics['avg'] * metrics['count']:.6f}s\n\n"
@@ -281,19 +269,19 @@ def main() -> None:
         "--profiles",
         type=str,
         default="profiles",
-        help="Directory containing profile output (default: 'profiles')"
+        help="Directory containing profile output (default: 'profiles')",
     )
     parser.add_argument(
         "--log",
         type=str,
         default="profiling.log",
-        help="Profiling log file (default: 'profiling.log')"
+        help="Profiling log file (default: 'profiling.log')",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="profile_analysis",
-        help="Output directory for analysis results (default: 'profile_analysis')"
+        help="Output directory for analysis results (default: 'profile_analysis')",
     )
 
     args = parser.parse_args()
@@ -306,10 +294,7 @@ def main() -> None:
     log_metrics = parse_profiling_log(args.log)
 
     # Plot section metrics
-    plot_section_metrics(
-        log_metrics,
-        output_file=f"{args.output}/section_metrics.png"
-    )
+    plot_section_metrics(log_metrics, output_file=f"{args.output}/section_metrics.png")
 
     # Find the latest profile file
     profile_files = glob.glob(f"{args.profiles}/*.prof")
@@ -325,16 +310,14 @@ def main() -> None:
 
     # Plot profile stats
     plot_profile_stats(
-        time_stats,
-        call_stats,
-        output_file=f"{args.output}/profile_stats.png"
+        time_stats, call_stats, output_file=f"{args.output}/profile_stats.png"
     )
 
     # Generate bottleneck report
     report = generate_bottleneck_report(log_metrics, time_stats)
 
     # Save the report
-    with open(f"{args.output}/bottleneck_report.md", 'w') as f:
+    with open(f"{args.output}/bottleneck_report.md", "w") as f:
         f.write(report)
 
     print(f"Analysis complete. Results saved to {args.output}")
@@ -342,4 +325,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

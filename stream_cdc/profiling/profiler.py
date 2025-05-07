@@ -5,21 +5,17 @@ import time
 import tracemalloc
 import logging
 import os
-import sys
 from functools import wraps
 from typing import Dict, Any, List, Callable, Optional, TypeVar, Union
 
 # Type hints
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("profiling.log"),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("profiling.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger("profiler")
 
@@ -28,6 +24,7 @@ def memory_profile(func: F) -> F:
     """
     Decorator to track memory usage of a function.
     """
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         tracemalloc.start()
@@ -53,6 +50,7 @@ def time_profile(func: F) -> F:
     """
     Decorator to track execution time of a function.
     """
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         start_time = time.time()
@@ -69,17 +67,13 @@ class FunctionProfiler:
     """
     Profiles functions using cProfile.
     """
+
     def __init__(self, output_dir: str = "profiles"):
         self.output_dir = output_dir
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-    def profile_function(
-        self,
-        func: Callable,
-        *args: Any,
-        **kwargs: Any
-    ) -> Any:
+    def profile_function(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """
         Profile a function and save results.
         """
@@ -93,7 +87,7 @@ class FunctionProfiler:
 
             # Save profiling stats
             s = io.StringIO()
-            ps = pstats.Stats(profiler, stream=s).sort_stats('cumulative')
+            ps = pstats.Stats(profiler, stream=s).sort_stats("cumulative")
             ps.print_stats(30)  # Print top 30 functions
 
             # Save to file
@@ -110,6 +104,7 @@ class PerformanceTracker:
     """
     Tracks various performance metrics during execution.
     """
+
     def __init__(self):
         self.metrics: Dict[str, List[Dict[str, Union[float, int]]]] = {}
 
@@ -121,10 +116,7 @@ class PerformanceTracker:
             self.metrics[name] = []
 
         start_id = len(self.metrics[name])
-        self.metrics[name].append({
-            'start_time': time.time(),
-            'id': start_id
-        })
+        self.metrics[name].append({"start_time": time.time(), "id": start_id})
 
         return start_id
 
@@ -138,14 +130,12 @@ class PerformanceTracker:
 
         end_time = time.time()
         metrics_entry = self.metrics[name][tracking_id]
-        start_time = metrics_entry['start_time']
+        start_time = metrics_entry["start_time"]
 
         # Update with duration and any extra data
-        metrics_entry.update({
-            'end_time': end_time,
-            'duration': end_time - start_time,
-            **extra_data
-        })
+        metrics_entry.update(
+            {"end_time": end_time, "duration": end_time - start_time, **extra_data}
+        )
 
     def get_metrics(self) -> Dict[str, List[Dict[str, Union[float, int]]]]:
         """
@@ -161,9 +151,7 @@ class PerformanceTracker:
             return None
 
         durations = [
-            m.get('duration', 0)
-            for m in self.metrics[name]
-            if 'duration' in m
+            m.get("duration", 0) for m in self.metrics[name] if "duration" in m
         ]
 
         if not durations:
@@ -176,13 +164,13 @@ class PerformanceTracker:
         Log a summary of all tracked metrics.
         """
         for name, measurements in self.metrics.items():
-            completed = [m for m in measurements if 'duration' in m]
+            completed = [m for m in measurements if "duration" in m]
             if not completed:
                 continue
 
-            avg_duration = sum(m['duration'] for m in completed) / len(completed)
-            max_duration = max(m['duration'] for m in completed)
-            min_duration = min(m['duration'] for m in completed)
+            avg_duration = sum(m["duration"] for m in completed) / len(completed)
+            max_duration = max(m["duration"] for m in completed)
+            min_duration = min(m["duration"] for m in completed)
 
             logger.info(
                 f"Section {name}: count={len(completed)}, "
@@ -193,9 +181,7 @@ class PerformanceTracker:
 
 # Helper to patch methods for profiling
 def patch_class_methods(
-    cls: Any,
-    method_names: List[str],
-    decorator: Callable[[F], F]
+    cls: Any, method_names: List[str], decorator: Callable[[F], F]
 ) -> None:
     """
     Patch specified methods of a class with a decorator.
@@ -234,8 +220,7 @@ def track_method_calls(cls: Any, methods: List[str]) -> None:
                 return result
             finally:
                 performance_tracker.stop_tracking(
-                    f"{cls.__name__}.{method_name}",
-                    tracking_id
+                    f"{cls.__name__}.{method_name}", tracking_id
                 )
 
         setattr(cls, method_name, tracked_method)
@@ -249,7 +234,6 @@ def main() -> None:
 
     @memory_profile
     def example_function() -> None:
-        data = [i for i in range(1000000)]
         time.sleep(0.5)
 
     example_function()
@@ -263,4 +247,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

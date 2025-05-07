@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import sys
-from typing import Any, Dict, List
 import time
 import argparse
 from dotenv import load_dotenv
@@ -10,15 +9,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import the profiler
-from profiler import (
-    FunctionProfiler,
-    performance_tracker,
-    patch_class_methods,
-    time_profile,
-    memory_profile,
-    track_method_calls,
-    logger
-)
+from profiler import FunctionProfiler, performance_tracker, track_method_calls, logger
 
 # Import app modules
 from stream_cdc.utils.logger import Logger
@@ -43,30 +34,30 @@ def setup_profiling() -> None:
     classes_to_profile = [
         # Stream class
         (SQS, ["send", "_prepare_sqs_entries", "_send_batch_to_sqs"]),
-
         # Data source
-        (MySQLDataSource, [
-            "connect", "listen", "_format_row_events",
-            "_create_event_dict", "disconnect"
-        ]),
-
+        (
+            MySQLDataSource,
+            [
+                "connect",
+                "listen",
+                "_format_row_events",
+                "_create_event_dict",
+                "disconnect",
+            ],
+        ),
         # State management
         (Dynamodb, ["store", "read", "_ensure_table_exists"]),
-
         # Coordinator
-        (Coordinator, [
-            "start", "process_next", "_process_event",
-            "_flush_to_stream", "stop"
-        ]),
-
+        (
+            Coordinator,
+            ["start", "process_next", "_process_event", "_flush_to_stream", "stop"],
+        ),
         # Worker
         (Worker, ["run", "stop"]),
-
         # Utilities
         (Serializer, ["serialize"]),
-
         # Policy
-        (BatchSizeAndTimePolicy, ["should_flush", "reset"])
+        (BatchSizeAndTimePolicy, ["should_flush", "reset"]),
     ]
 
     # Apply tracking to all listed classes
@@ -76,10 +67,7 @@ def setup_profiling() -> None:
     logger.info("Profiling has been set up for key components")
 
 
-def run_profiled_app(
-    duration: float,
-    profile_output: str
-) -> None:
+def run_profiled_app(duration: float, profile_output: str) -> None:
     """
     Run the application with profiling for a specific duration.
 
@@ -119,8 +107,7 @@ def run_profiled_app(
         state_manager = StateManagerFactory.create(state_manager_type)
         event_processor = DefaultEventProcessor()
         flush_policy = BatchSizeAndTimePolicy(
-            batch_size=app_config.batch_size,
-            flush_interval=app_config.flush_interval
+            batch_size=app_config.batch_size, flush_interval=app_config.flush_interval
         )
 
         coordinator = Coordinator(
@@ -162,13 +149,13 @@ def main() -> None:
         "--duration",
         type=float,
         default=60.0,
-        help="Duration in seconds to run the application (default: 60)"
+        help="Duration in seconds to run the application (default: 60)",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="profiles",
-        help="Directory to save profile output (default: 'profiles')"
+        help="Directory to save profile output (default: 'profiles')",
     )
 
     args = parser.parse_args()
@@ -182,4 +169,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
