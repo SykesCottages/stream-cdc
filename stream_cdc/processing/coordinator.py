@@ -1,5 +1,6 @@
 from typing import Iterator, List, Dict, Any, Optional, Protocol
 import time
+from threading import Lock
 from stream_cdc.utils.logger import logger
 from stream_cdc.streams.base import Stream
 from stream_cdc.datasources.base import DataSource
@@ -28,6 +29,11 @@ class BatchSizeAndTimePolicy:
     """
 
     def __init__(self, batch_size: int, flush_interval: float):
+        if batch_size <= 0:
+            raise ValueError("Batch size must be positive")
+        if flush_interval <= 0:
+            raise ValueError("Flush interval must be positive")
+
         self.batch_size = batch_size
         self.flush_interval = flush_interval
 
@@ -62,6 +68,7 @@ class StateCheckpointManager:
         self.datasource = datasource
         self.state_manager = state_manager
         self._last_saved_position: str = ""
+        self._lock = Lock()
 
     def load_state(self) -> None:
         """Load the last saved state and configure the datasource."""
@@ -100,47 +107,56 @@ class StateCheckpointManager:
         except Exception as e:
             logger.error(f"Error loading state: {e}")
 
-    def save_state(self) -> None:
-        """Save the current position state from the datasource."""
+    def save_state(self) -> bool:
+        """
+        Save the current position state from the datasource.
+
+        Returns:
+            bool: True if state was saved, False otherwise
+        """
         if not self.state_manager:
-            return
+            return False
 
-        try:
-            position = self.datasource.get_current_position()
-            logger.debug(f"Position: {position}")
+        with self._lock:
+            try:
+                position = self.datasource.get_current_position()
 
-            if not position or not isinstance(position, str) or not position:
-                logger.debug("No valid position available from datasource")
-                return
+                if not position or not isinstance(position, str):
+                    logger.debug("No valid position available from datasource")
+                    return False
 
-            datasource_type = self.datasource.get_source_type()
-            datasource_id = self.datasource.get_source_id()
+                datasource_type = self.datasource.get_source_type()
+                datasource_id = self.datasource.get_source_id()
 
-            if not datasource_type or not datasource_id:
-                logger.warning(
-                    "Unable to determine data source type or source identifier"
+                if not datasource_type or not datasource_id:
+                    logger.warning(
+                        "Unable to determine data source type or source identifier"
+                    )
+                    return False
+
+                if self._last_saved_position == position:
+                    logger.debug(
+                        f"Position {position} already saved, skipping duplicate save"
+                    )
+                    return True
+
+                result = self.state_manager.store(
+                    datasource_type=datasource_type,
+                    datasource_source=datasource_id,
+                    state_position=position,
                 )
-                return
 
-            if self._last_saved_position == position:
-                logger.debug(
-                    f"Position {position} already saved, skipping duplicate save"
-                )
-                return
+                if result:
+                    self._last_saved_position = position
+                    logger.debug(
+                        f"Updated state for {datasource_type}:{datasource_id} "
+                        f"to {position}"
+                    )
+                return result
 
-            self.state_manager.store(
-                datasource_type=datasource_type,
-                datasource_source=datasource_id,
-                state_position=position,
-            )
-
-            self._last_saved_position = position
-
-            logger.debug(
-                f"Updated state for {datasource_type}:{datasource_id} to {position}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to save state: {e}")
+            except Exception as e:
+                logger.error(f"Failed to save state: {e}")
+                return False
 
 
 class Coordinator:
@@ -180,17 +196,26 @@ class Coordinator:
         self.buffer: List[Dict[str, Any]] = []
         self.last_flush_time = time.time()
         self._current_iterator: Optional[Iterator[Dict[str, Any]]] = None
+        self._is_started = False
+        self._is_stopped = False
+        self._lock = Lock()
 
     def start(self) -> None:
         """Start the coordinator by loading state and connecting to datasource."""
-        try:
-            self.state_checkpoint_manager.load_state()
-            self.datasource.connect()
-            logger.info("Connected to data source")
-        except Exception as e:
-            error_msg = f"Failed to start coordinator: {str(e)}"
-            logger.error(error_msg)
-            raise ProcessingError(error_msg)
+        with self._lock:
+            if self._is_started:
+                logger.debug("Coordinator already started")
+                return
+
+            try:
+                self.state_checkpoint_manager.load_state()
+                self.datasource.connect()
+                self._is_started = True
+                logger.info("Connected to data source")
+            except Exception as e:
+                error_msg = f"Failed to start coordinator: {str(e)}"
+                logger.error(error_msg)
+                raise ProcessingError(error_msg)
 
     def process_next(self) -> bool:
         """
@@ -202,38 +227,49 @@ class Coordinator:
         Returns:
             bool: True if events were processed, False otherwise
         """
+        if not self._is_started or self._is_stopped:
+            logger.warning("Cannot process events - coordinator not started or "
+                "already stopped")
+            return False
+
         try:
-            # Initialize our iterator if needed
             if self._current_iterator is None:
                 self._current_iterator = self.datasource.listen()
 
-            # Check if we need to flush before processing new events
-            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
-                self._flush_to_stream()
-
-            # Process available events
+            # Process available events up to batch size limit
             events_processed = 0
-            should_continue = True
+            max_batch_size = self.flush_policy.batch_size
+            batch_start_time = time.time()
 
-            while should_continue:
+            # Pre-allocate the batch
+            current_batch = []
+
+            # Process events in a batch-oriented way
+            while events_processed < max_batch_size:
                 try:
+                    # Get next event
                     event = next(self._current_iterator)
-                    self._process_event(event)
+
+                    # Process event
+                    processed_event = self.event_processor.process(event)
+                    current_batch.append(processed_event)
                     events_processed += 1
 
-                    # Check if we should stop processing and flush
-                    should_continue = not self.flush_policy.should_flush(
-                        self.buffer, self.last_flush_time
-                    )
+                    # If we've collected enough events, stop collecting
+                    if len(current_batch) >= max_batch_size:
+                        break
+
                 except StopIteration:
                     self._current_iterator = None
-                    if events_processed == 0:
-                        return False
                     break
 
-            # Final flush check after processing
-            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
-                self._flush_to_stream()
+            # Add collected events to the buffer
+            if current_batch:
+                self.buffer.extend(current_batch)
+
+                # Check if we should flush
+                if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
+                    self._flush_to_stream()
 
             return events_processed > 0
 
@@ -242,27 +278,25 @@ class Coordinator:
             logger.error(error_msg)
             raise ProcessingError(error_msg)
 
-    def _process_event(self, event: Dict[str, Any]) -> None:
-        """Process a single event through the event processor and buffer it."""
-        processed_event = self.event_processor.process(event)
-        self.buffer.append(processed_event)
-        logger.debug(f"Processed event, buffer size: {len(self.buffer)}")
-
     def _flush_to_stream(self) -> None:
         """Send buffered events to the stream and update state."""
         if not self.buffer:
             return
 
-        messages = self.buffer
+        messages = self.buffer.copy()  # Create a copy to avoid race conditions
         logger.debug(f"Flushing {len(messages)} messages to stream")
 
         try:
             self.stream.send(messages)
-            self.state_checkpoint_manager.save_state()
+            state_saved = self.state_checkpoint_manager.save_state()
 
-            self.buffer.clear()
-            self.last_flush_time = time.time()
-            self.flush_policy.reset()
+            if state_saved:
+                self.buffer.clear()
+                self.last_flush_time = time.time()
+                self.flush_policy.reset()
+            else:
+                logger.warning("State not saved, keeping messages in buffer")
+
         except Exception as e:
             error_msg = f"Failed to flush messages: {str(e)}"
             logger.error(error_msg)
@@ -270,11 +304,27 @@ class Coordinator:
 
     def stop(self) -> None:
         """Stop the coordinator and clean up resources."""
-        logger.debug("Stopping coordinator")
-        try:
-            self._flush_to_stream()
-            self.stream.close()
-            self.datasource.disconnect()
-            logger.info("Coordinator stopped")
-        except Exception as e:
-            logger.error(f"Error stopping coordinator: {e}")
+        with self._lock:
+            if self._is_stopped:
+                logger.debug("Coordinator already stopped")
+                return
+
+            logger.debug("Stopping coordinator")
+            try:
+                self._is_stopped = True
+
+                if self.buffer:
+                    logger.debug(f"Flushing remaining {len(self.buffer)} messages")
+                    self._flush_to_stream()
+
+                if hasattr(self.stream, 'close') and callable(self.stream.close):
+                    self.stream.close()
+
+                if (hasattr(self.datasource, 'disconnect') and
+                    callable(self.datasource.disconnect)):
+                    self.datasource.disconnect()
+
+                logger.info("Coordinator stopped")
+            except Exception as e:
+                logger.error(f"Error stopping coordinator: {e}")
+
