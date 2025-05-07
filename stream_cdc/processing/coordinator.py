@@ -203,37 +203,44 @@ class Coordinator:
             bool: True if events were processed, False otherwise
         """
         try:
-            # Initialize our iterator if needed
             if self._current_iterator is None:
                 self._current_iterator = self.datasource.listen()
 
-            # Check if we need to flush before processing new events
-            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
-                self._flush_to_stream()
-
-            # Process available events
+            # Process available events up to batch size limit
             events_processed = 0
-            should_continue = True
+            max_batch_size = self.flush_policy.batch_size
+            print(f"Max batch size: {max_batch_size}")
+            batch_start_time = time.time()
 
-            while should_continue:
+            # Pre-allocate the batch
+            current_batch = []
+
+            # Process events in a batch-oriented way
+            while events_processed < max_batch_size:
                 try:
+                    # Get next event
                     event = next(self._current_iterator)
-                    self._process_event(event)
+
+                    # Process event
+                    processed_event = self.event_processor.process(event)
+                    current_batch.append(processed_event)
                     events_processed += 1
 
-                    # Check if we should stop processing and flush
-                    should_continue = not self.flush_policy.should_flush(
-                        self.buffer, self.last_flush_time
-                    )
+                    # If we've collected enough events, stop collecting
+                    if len(current_batch) >= max_batch_size:
+                        break
+
                 except StopIteration:
                     self._current_iterator = None
-                    if events_processed == 0:
-                        return False
                     break
 
-            # Final flush check after processing
-            if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
-                self._flush_to_stream()
+            # Add collected events to the buffer
+            if current_batch:
+                self.buffer.extend(current_batch)
+
+                # Check if we should flush
+                if self.flush_policy.should_flush(self.buffer, self.last_flush_time):
+                    self._flush_to_stream()
 
             return events_processed > 0
 
