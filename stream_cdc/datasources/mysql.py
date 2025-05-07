@@ -2,6 +2,7 @@ from typing import Generator, Any, Dict, Optional, Union
 import os
 import random
 import time
+from functools import lru_cache
 import pymysql
 from pymysql.cursors import Cursor
 from pymysqlreplication import BinLogStreamReader
@@ -43,18 +44,24 @@ class MySQLSettingsValidator:
         self.user = user
         self.password = password
         self.port = port
+        self.conn = None
 
-        try:
-            self.conn = pymysql.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                port=self.port,
-            )
-        except Exception as e:
-            error_msg = f"Failed to connect to MySQL: {e}"
-            logger.error(error_msg)
-            raise ConfigurationError(error_msg)
+    def _get_connection(self):
+        """Get a database connection, creating it if necessary."""
+        if self.conn is None:
+            try:
+                self.conn = pymysql.connect(
+                    host=self.host,
+                    user=self.user,
+                    password=self.password,
+                    port=self.port,
+                    connect_timeout=5,
+                )
+            except Exception as e:
+                error_msg = f"Failed to connect to MySQL: {e}"
+                logger.error(error_msg)
+                raise ConfigurationError(error_msg)
+        return self.conn
 
     def _get_required_settings(self) -> Dict[str, str]:
         return {
@@ -102,18 +109,23 @@ class MySQLSettingsValidator:
 
     def validate(self) -> None:
         try:
-            with self.conn.cursor() as cursor:
+            conn = self._get_connection()
+            with conn.cursor() as cursor:
                 actual_settings = self._fetch_actual_settings(cursor)
                 self._verify_settings(actual_settings)
-
-            self.conn.close()
-
         except Exception as e:
             if not isinstance(e, ConfigurationError):
-                error_msg = f"Failed to connect to MySQL: {e}"
+                error_msg = f"Failed to validate MySQL settings: {e}"
                 logger.error(error_msg)
                 raise ConfigurationError(error_msg)
             raise
+        finally:
+            if self.conn:
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
 
 
 class MySQLDataSource(DataSource):
@@ -144,6 +156,7 @@ class MySQLDataSource(DataSource):
         self.port = port or int(os.getenv("DB_PORT", "3306"))
         self.binlog_client = BinLogStreamReader
         self.client = None
+        self.conn = None
 
         # Use GTIDPosition object instead of raw string
         self.start_position = None
@@ -152,18 +165,25 @@ class MySQLDataSource(DataSource):
         self.transaction_complete = False
         self.last_event_time = 0
         self.event_timeout = 30
+        self._is_connected = False
 
-        try:
-            self.conn = pymysql.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                port=self.port,
-            )
-        except Exception as e:
-            error_msg = f"Failed to connect to MySQL: {e}"
-            logger.error(error_msg)
-            raise ConfigurationError(error_msg)
+    @lru_cache(maxsize=1)
+    def _get_connection(self):
+        """Get a database connection with caching to avoid repeated connects."""
+        if self.conn is None:
+            try:
+                self.conn = pymysql.connect(
+                    host=self.host,
+                    user=self.user,
+                    password=self.password,
+                    port=self.port,
+                    connect_timeout=5,
+                )
+            except Exception as e:
+                error_msg = f"Failed to connect to MySQL: {e}"
+                logger.error(error_msg)
+                raise ConfigurationError(error_msg)
+        return self.conn
 
     def _validate_settings(self) -> None:
         try:
@@ -179,6 +199,7 @@ class MySQLDataSource(DataSource):
             raise
 
     def _create_binlog_client(self) -> BinLogStreamReader:
+        """Create a binlog stream reader client."""
         connection_settings = {
             "host": self.host,
             "user": self.user,
@@ -208,6 +229,7 @@ class MySQLDataSource(DataSource):
         return self.binlog_client(**client_args)
 
     def _get_gtid_server_info(self, cursor: Cursor) -> ServerInfo:
+        """Get GTID and server UUID information."""
         cursor.execute("SELECT @@GLOBAL.SERVER_UUID")
         server_uuid = cursor.fetchone()
         if server_uuid is None:
@@ -223,9 +245,7 @@ class MySQLDataSource(DataSource):
         return ServerInfo(server_uuid=server_uuid, gtid_executed=gtid_executed)
 
     def _format_gtid(self, gtid: str) -> str:
-        """
-        Format the GTID string to match the expected format.
-        """
+        """Format the GTID string to match the expected format."""
         if not gtid:
             return ""
 
@@ -236,7 +256,8 @@ class MySQLDataSource(DataSource):
             current_position = f"{server_uuid}:1-{gtid_position}"
 
             logger.debug(f"Formatting GTID: {gtid}")
-            with self.conn.cursor() as cursor:
+            conn = self._get_connection()
+            with conn.cursor() as cursor:
                 info = self._get_gtid_server_info(cursor)
                 if info.server_uuid != server_uuid:
                     raise ConfigurationError(
@@ -256,6 +277,11 @@ class MySQLDataSource(DataSource):
             raise ConfigurationError(f"Invalid GTID format: {gtid}")
 
     def connect(self) -> None:
+        """Connect to the MySQL binlog stream."""
+        if self._is_connected:
+            logger.debug("Already connected to MySQL")
+            return
+
         logger.info(f"Connecting to MySQL at {self.host}:{self.port}")
 
         retry_count = 0
@@ -266,6 +292,7 @@ class MySQLDataSource(DataSource):
             try:
                 self._validate_settings()
                 self.client = self._create_binlog_client()
+                self._is_connected = True
                 logger.info("Connected to MySQL binlog stream")
                 return
             except Exception as e:
@@ -285,12 +312,7 @@ class MySQLDataSource(DataSource):
                     )
 
                     # Close any existing client
-                    if self.client:
-                        try:
-                            self.client.close()
-                        except Exception:
-                            pass
-                        self.client = None
+                    self._close_client()
 
                     retry_count += 1
                     # Use exponential backoff with jitter
@@ -309,7 +331,18 @@ class MySQLDataSource(DataSource):
             f"Failed to connect after {max_retries} attempts with different server IDs"
         )
 
+    def _close_client(self) -> None:
+        """Close the binlog client safely."""
+        if self.client:
+            try:
+                self.client.close()
+            except Exception as e:
+                logger.debug(f"Error closing binlog client: {e}")
+            finally:
+                self.client = None
+
     def _get_event_type(self, event) -> str:
+        """Get the type of binlog event."""
         if isinstance(event, WriteRowsEvent):
             return "Insert"
         if isinstance(event, UpdateRowsEvent):
@@ -319,6 +352,7 @@ class MySQLDataSource(DataSource):
         return type(event).__name__
 
     def _process_query_event(self, event) -> None:
+        """Process a query event from the binlog."""
         try:
             query = event.query
             if isinstance(query, bytes):
@@ -331,7 +365,13 @@ class MySQLDataSource(DataSource):
             logger.warning(f"Failed to process query: {e}")
 
     def listen(self) -> Generator[Dict[str, Any], None, None]:
-        if not self.client:
+        """
+        Listen for binlog events and yield them as dictionaries.
+
+        Yields:
+            Dict[str, Any]: Formatted event data
+        """
+        if not self._is_connected or not self.client:
             raise DataSourceError("Data source not connected")
 
         try:
@@ -362,6 +402,7 @@ class MySQLDataSource(DataSource):
             raise DataSourceError(f"Error processing binlog: {str(e)}")
 
     def _format_row_events(self, event) -> Generator[Dict[str, Any], None, None]:
+        """Format row events from the binlog into dictionaries."""
         if not self.current_position:
             logger.warning("Processing row event without GTID context")
             return
@@ -373,6 +414,7 @@ class MySQLDataSource(DataSource):
             yield self._create_event_dict(event, event_type, row)
 
     def _create_event_dict(self, event, event_type: str, row) -> Dict[str, Any]:
+        """Create a dictionary representation of an event."""
         result = {
             "event_type": event_type,
             "gtid": self.current_position,
@@ -384,24 +426,32 @@ class MySQLDataSource(DataSource):
         return result
 
     def disconnect(self) -> None:
-        if not self.client:
+        """Disconnect from MySQL binlog stream."""
+        if not self._is_connected:
             return
 
         logger.info("Disconnecting from MySQL")
-        try:
-            self.client.close()
-        except Exception as e:
-            logger.error(f"Error while disconnecting from MySQL: {e}")
-        finally:
-            self.client = None
+        self._is_connected = False
+        self._close_client()
+
+        # Close the connection
+        if self.conn:
+            try:
+                self.conn.close()
+            except Exception as e:
+                logger.debug(f"Error closing database connection: {e}")
+            finally:
+                self.conn = None
 
     def get_current_position(self) -> str:
+        """Get the current binlog position."""
         if not self.current_position:
             logger.warning("No current position available")
             return ""
         return self.current_position
 
     def set_start_position(self, position: str) -> None:
+        """Set the starting binlog position."""
         if not position:
             logger.warning("No position data provided")
             return
@@ -410,9 +460,11 @@ class MySQLDataSource(DataSource):
         logger.info(f"Position set to: {self.start_position}")
 
     def get_source_type(self) -> str:
+        """Get the data source type."""
         return "mysql"
 
     def get_source_id(self) -> str:
+        """Get the data source identifier."""
         if not self.host:
             raise DataSourceError("No host configured")
         return self.host
