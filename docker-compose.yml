@@ -54,7 +54,7 @@ services:
       sh -c "
         uv venv .venv &&
         uv sync &&
-        watchmedo auto-restart --recursive --directory=stream_cdc --patterns='**/*.py' --no-restart-on-command-exit -- python -m stream_cdc.profiling.profiling_app
+        watchmedo auto-restart --recursive --directory=stream_cdc --patterns='**/*.py' --no-restart-on-command-exit -- python -m stream_cdc.main
       "
 volumes:
   mysql_data:
